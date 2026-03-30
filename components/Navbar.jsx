@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'; // تأكد إنه client-only keys
 import { FiMenu, FiX, FiBookOpen, FiLogIn, FiHome, FiUser, FiMessageCircle } from 'react-icons/fi';
 
 export default function Navbar() {
@@ -11,10 +11,17 @@ export default function Navbar() {
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.from('site_settings').select('*').single();
-      setSettings(data);
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      try {
+        // fetch إعدادات الموقع
+        const { data, error } = await supabase.from('site_settings').select('*').single();
+        if (!error) setSettings(data);
+
+        // fetch المستخدم الحالي
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (!userError) setUser(userData.user);
+      } catch (err) {
+        console.error('Navbar load error:', err);
+      }
     };
     load();
   }, []);
