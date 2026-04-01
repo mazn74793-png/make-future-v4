@@ -18,18 +18,17 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       toast.error('❌ إيميل أو باسورد غلط');
+      setLoading(false);
     } else {
       toast.success('✅ تم تسجيل الدخول');
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     }
-    setLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center gradient-dark px-4">
       <div className="absolute top-20 right-20 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl" />
       <div className="absolute bottom-20 left-20 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl" />
-
       <div className="relative z-10 glass rounded-3xl p-8 w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
           <div className="w-16 h-16 gradient-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -38,7 +37,6 @@ export default function LoginPage() {
           <h1 className="text-3xl font-black">تسجيل الدخول</h1>
           <p className="text-gray-400 mt-2">ادخل بياناتك عشان تكمل</p>
         </div>
-
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label className="text-sm text-gray-400 mb-1 block">الإيميل</label>
@@ -65,8 +63,13 @@ export default function LoginPage() {
             {loading ? '⏳ جاري الدخول...' : '🚀 دخول'}
           </button>
         </form>
-
         <div className="text-center mt-6">
+          <p className="text-gray-500 text-sm mb-2">
+            مش عندك حساب؟{' '}
+            <Link href="/register" className="text-purple-400 font-semibold hover:text-purple-300">
+              سجل هنا
+            </Link>
+          </p>
           <Link href="/" className="text-gray-400 hover:text-white transition text-sm">← رجوع للرئيسية</Link>
         </div>
       </div>
