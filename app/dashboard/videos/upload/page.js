@@ -22,22 +22,54 @@ export default function UploadVideoPage() {
     if (!file || !title || !courseId) { toast.error('كمل كل البيانات'); return; }
     setUploading(true);
     setProgress(10);
-    const formData = new FormData();
-    formData.append('video', file);
-    formData.append('title', title);
-    formData.append('courseId', courseId);
-    formData.append('isFree', isFree);
+
     try {
+      // 1. اطلب presigned URL من السيرفر
+      const res = await fetch('/api/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          title,
+          courseId,
+          isFree,
+          fileSize: file.size,
+        }),
+      });
+
+      const { uploadUrl, error } = await res.json();
+      if (error) { toast.error(error); setUploading(false); return; }
+
       setProgress(30);
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      setProgress(80);
-      const data = await res.json();
-      if (data.success) {
-        setProgress(100);
-        toast.success('الفيديو اترفع');
-        setTitle(''); setFile(null); setCourseId(''); setIsFree(false);
-      } else { toast.error(data.error); }
-    } catch { toast.error('حصل مشكلة'); }
+
+      // 2. ارفع الفيديو مباشرة لـ R2 من البراوزر
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 60) + 30; // 30% → 90%
+            setProgress(pct);
+          }
+        });
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) resolve();
+          else reject(new Error('فشل الرفع لـ R2'));
+        });
+        xhr.addEventListener('error', () => reject(new Error('خطأ في الشبكة')));
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+      });
+
+      setProgress(100);
+      toast.success('✅ الفيديو اترفع بنجاح!');
+      setTitle(''); setFile(null); setCourseId(''); setIsFree(false); setProgress(0);
+
+    } catch (err) {
+      toast.error(err.message || 'حصل مشكلة');
+    }
+
     setUploading(false);
   };
 
@@ -77,18 +109,23 @@ export default function UploadVideoPage() {
             <div>
               <FiUploadCloud className="text-4xl text-gray-500 mx-auto mb-3" />
               <p className="text-gray-400">اضغط لاختيار الفيديو</p>
-              <p className="text-gray-600 text-sm mt-1">MP4, MOV - حد اقصى 500MB</p>
+              <p className="text-gray-600 text-sm mt-1">MP4, MOV - بدون حد اقصى 🚀</p>
             </div>
           )}
         </div>
         {uploading && (
-          <div className="w-full bg-white/5 rounded-full h-3">
-            <div className="gradient-primary h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+          <div>
+            <div className="w-full bg-white/5 rounded-full h-3 mb-2">
+              <div className="gradient-primary h-full rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="text-center text-sm text-gray-400">{progress}% - جاري الرفع مباشرة لـ Cloudflare R2...</p>
           </div>
         )}
         <button type="submit" disabled={uploading}
           className="w-full gradient-primary py-4 rounded-xl text-white font-bold text-lg hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
-          {uploading ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> جاري الرفع... {progress}%</> : <><FiUploadCloud /> ارفع الفيديو</>}
+          {uploading
+            ? <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> جاري الرفع... {progress}%</>
+            : <><FiUploadCloud /> ارفع الفيديو</>}
         </button>
       </form>
     </div>
