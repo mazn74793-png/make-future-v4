@@ -15,8 +15,29 @@ export default function DashboardLayout({ children }) {
     const check = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
-      const { data: admin } = await supabase.from('admins').select('*').eq('email', user.email).single();
-      if (!admin) { router.push('/'); return; }
+
+      const { data: admin } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('email', user.email)
+        .single();
+
+      if (!admin) {
+        // مش أدمن — شوف هل طالب pending أو لا
+        const { data: student } = await supabase
+          .from('students')
+          .select('status')
+          .eq('user_id', user.id)
+          .single();
+
+        if (student?.status === 'pending') {
+          router.push('/pending');
+        } else {
+          router.push('/login');
+        }
+        return;
+      }
+
       setUser(user);
       setLoading(false);
     };
@@ -55,7 +76,6 @@ export default function DashboardLayout({ children }) {
             </div>
             <button onClick={() => setSidebarOpen(false)} className="md:hidden text-white text-xl">X</button>
           </div>
-
           <nav className="space-y-1">
             {menu.map((item) => (
               <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}
@@ -64,7 +84,6 @@ export default function DashboardLayout({ children }) {
               </Link>
             ))}
           </nav>
-
           <div className="mt-8 pt-4 border-t border-white/5">
             <p className="text-gray-500 text-xs mb-3 px-4">{user?.email}</p>
             <button onClick={async () => { await supabase.auth.signOut(); router.push('/'); }}
@@ -72,7 +91,6 @@ export default function DashboardLayout({ children }) {
               تسجيل خروج
             </button>
           </div>
-
           <div className="mt-4 px-4">
             <Link href="/" className="text-gray-500 hover:text-white text-sm transition block">
               رجوع للموقع
