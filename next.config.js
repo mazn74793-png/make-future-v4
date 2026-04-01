@@ -5,6 +5,6 @@ const nextConfig = {
       { protocol: 'https', hostname: '**' }
     ],
   },
+  // مش محتاجين نزود الـ body size لأن الرفع بيحصل مباشرة لـ R2
 };
-
 module.exports = nextConfig;
