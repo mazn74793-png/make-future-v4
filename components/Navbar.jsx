@@ -1,13 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase'; // تأكد إنه client-only keys
+import { supabase } from '@/lib/supabase';
 import { FiMenu, FiX, FiBookOpen, FiLogIn, FiHome, FiUser, FiMessageCircle } from 'react-icons/fi';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [settings, setSettings] = useState(null);
-  const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -17,8 +17,16 @@ export default function Navbar() {
         if (!error) setSettings(data);
 
         // fetch المستخدم الحالي
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (!userError) setUser(userData.user);
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          // تحقق إنه admin فقط
+          const { data: admin } = await supabase
+            .from('admins')
+            .select('id')
+            .eq('email', userData.user.email)
+            .single();
+          if (admin) setIsAdmin(true);
+        }
       } catch (err) {
         console.error('Navbar load error:', err);
       }
@@ -56,12 +64,14 @@ export default function Navbar() {
                 <FiMessageCircle /> تواصل
               </a>
             )}
-            {user ? (
-              <Link href="/dashboard" className="gradient-primary px-6 py-2 rounded-xl text-white font-medium hover:opacity-90 transition flex items-center gap-1">
+            {isAdmin ? (
+              <Link href="/dashboard"
+                className="gradient-primary px-6 py-2 rounded-xl text-white font-medium hover:opacity-90 transition flex items-center gap-1">
                 <FiUser /> لوحة التحكم
               </Link>
             ) : (
-              <Link href="/login" className="gradient-primary px-6 py-2 rounded-xl text-white font-medium hover:opacity-90 transition flex items-center gap-1">
+              <Link href="/login"
+                className="gradient-primary px-6 py-2 rounded-xl text-white font-medium hover:opacity-90 transition flex items-center gap-1">
                 <FiLogIn /> دخول
               </Link>
             )}
@@ -80,9 +90,9 @@ export default function Navbar() {
               {settings?.whatsapp_number && (
                 <a href={`https://wa.me/${settings.whatsapp_number}`} target="_blank" className="text-gray-300 hover:text-white py-2">💬 تواصل</a>
               )}
-              <Link href={user ? "/dashboard" : "/login"} onClick={() => setIsOpen(false)}
+              <Link href={isAdmin ? "/dashboard" : "/login"} onClick={() => setIsOpen(false)}
                 className="gradient-primary text-center px-6 py-2 rounded-xl text-white font-medium">
-                {user ? '🎛️ لوحة التحكم' : '🔐 دخول'}
+                {isAdmin ? '🎛️ لوحة التحكم' : '🔐 دخول'}
               </Link>
             </div>
           </div>
