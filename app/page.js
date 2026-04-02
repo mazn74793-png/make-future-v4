@@ -85,10 +85,10 @@ const { count: coursesCount } = await supabase.from('courses').select('*', { cou
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16 animate-fade-in" style={{ animationDelay: '0.8s' }}>
             {[
-              { number: settings?.stats_students || '+500', label: 'طالب' },
-              { number: settings?.stats_videos || '+50', label: 'فيديو' },
-              { number: settings?.stats_courses || '+10', label: 'كورس' },
-              { number: settings?.stats_rating || '4.9', label: 'تقييم' },
+              { number: `+${studentsCount || 0}`, label: 'طالب' },
+{ number: `+${videosCount || 0}`, label: 'فيديو' },
+{ number: `+${coursesCount || 0}`, label: 'كورس' },
+{ number: settings?.stats_rating || '4.9', label: 'تقييم' },
             ].map((stat, i) => (
               <div key={i} className="text-center">
                 <div className="text-2xl md:text-4xl font-black bg-gradient-to-l from-purple-400 to-pink-400 bg-clip-text text-transparent">{stat.number}</div>
