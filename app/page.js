@@ -10,6 +10,10 @@ export default async function HomePage() {
   const { data: courses } = await supabase.from('courses').select('*').eq('is_published', true).order('order').limit(6);
   const { data: testimonials } = await supabase.from('testimonials').select('*').eq('is_visible', true).order('order').limit(6);
   const { data: announcements } = await supabase.from('announcements').select('*').eq('is_active', true);
+  // بدل الـ static stats في الـ page.js ضيف ده في الأول
+const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('status', 'approved');
+const { count: videosCount } = await supabase.from('videos').select('*', { count: 'exact', head: true });
+const { count: coursesCount } = await supabase.from('courses').select('*', { count: 'exact', head: true }).eq('is_published', true);
 
   if (settings?.is_maintenance) {
     return (
