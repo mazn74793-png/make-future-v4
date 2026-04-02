@@ -2,37 +2,37 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { FiMenu, FiX, FiBookOpen, FiLogIn, FiHome, FiUser, FiMessageCircle } from 'react-icons/fi';
+import { FiMenu, FiX, FiBookOpen, FiLogIn, FiHome, FiMessageCircle } from 'react-icons/fi';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [settings, setSettings] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userType, setUserType] = useState(null); // null | 'admin' | 'student'
 
   useEffect(() => {
     const load = async () => {
-      try {
-        // fetch إعدادات الموقع
-        const { data, error } = await supabase.from('site_settings').select('*').single();
-        if (!error) setSettings(data);
+      const { data } = await supabase.from('site_settings').select('*').single();
+      if (data) setSettings(data);
 
-        // fetch المستخدم الحالي
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user) {
-          // تحقق إنه admin فقط
-          const { data: admin } = await supabase
-            .from('admins')
-            .select('id')
-            .eq('email', userData.user.email)
-            .single();
-          if (admin) setIsAdmin(true);
-        }
-      } catch (err) {
-        console.error('Navbar load error:', err);
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: admin } = await supabase.from('admins').select('id').eq('email', user.email).single();
+      if (admin) { setUserType('admin'); return; }
+
+      const { data: student } = await supabase.from('students').select('status').eq('user_id', user.id).single();
+      if (student?.status === 'approved') setUserType('student');
     };
     load();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => load());
+    return () => subscription.unsubscribe();
   }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/';
+  };
 
   return (
     <nav className="fixed top-0 w-full z-50 glass">
@@ -55,23 +55,29 @@ export default function Navbar() {
             <Link href="/" className="text-gray-300 hover:text-white transition flex items-center gap-1">
               <FiHome /> الرئيسية
             </Link>
-            <Link href="/courses" className="text-gray-300 hover:text-white transition flex items-center gap-1">
-              <FiBookOpen /> الكورسات
-            </Link>
             {settings?.whatsapp_number && (
               <a href={`https://wa.me/${settings.whatsapp_number}`} target="_blank"
                 className="text-gray-300 hover:text-green-400 transition flex items-center gap-1">
                 <FiMessageCircle /> تواصل
               </a>
             )}
-            {isAdmin ? (
-              <Link href="/dashboard"
-                className="gradient-primary px-6 py-2 rounded-xl text-white font-medium hover:opacity-90 transition flex items-center gap-1">
-                <FiUser /> لوحة التحكم
+            {userType === 'admin' && (
+              <Link href="/dashboard" className="gradient-primary px-5 py-2 rounded-xl text-white font-medium hover:opacity-90 transition">
+                لوحة التحكم
               </Link>
-            ) : (
-              <Link href="/login"
-                className="gradient-primary px-6 py-2 rounded-xl text-white font-medium hover:opacity-90 transition flex items-center gap-1">
+            )}
+            {userType === 'student' && (
+              <>
+                <Link href="/student" className="gradient-primary px-5 py-2 rounded-xl text-white font-medium hover:opacity-90 transition">
+                  كورساتي
+                </Link>
+                <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 transition text-sm">
+                  خروج
+                </button>
+              </>
+            )}
+            {!userType && (
+              <Link href="/login" className="gradient-primary px-5 py-2 rounded-xl text-white font-medium hover:opacity-90 transition flex items-center gap-1">
                 <FiLogIn /> دخول
               </Link>
             )}
@@ -86,14 +92,27 @@ export default function Navbar() {
           <div className="md:hidden pb-4 animate-fade-in">
             <div className="flex flex-col gap-3">
               <Link href="/" onClick={() => setIsOpen(false)} className="text-gray-300 hover:text-white py-2">🏠 الرئيسية</Link>
-              <Link href="/courses" onClick={() => setIsOpen(false)} className="text-gray-300 hover:text-white py-2">📚 الكورسات</Link>
               {settings?.whatsapp_number && (
                 <a href={`https://wa.me/${settings.whatsapp_number}`} target="_blank" className="text-gray-300 hover:text-white py-2">💬 تواصل</a>
               )}
-              <Link href={isAdmin ? "/dashboard" : "/login"} onClick={() => setIsOpen(false)}
-                className="gradient-primary text-center px-6 py-2 rounded-xl text-white font-medium">
-                {isAdmin ? '🎛️ لوحة التحكم' : '🔐 دخول'}
-              </Link>
+              {userType === 'admin' && (
+                <Link href="/dashboard" onClick={() => setIsOpen(false)} className="gradient-primary text-center px-6 py-2 rounded-xl text-white font-medium">
+                  🎛️ لوحة التحكم
+                </Link>
+              )}
+              {userType === 'student' && (
+                <>
+                  <Link href="/student" onClick={() => setIsOpen(false)} className="gradient-primary text-center px-6 py-2 rounded-xl text-white font-medium">
+                    📚 كورساتي
+                  </Link>
+                  <button onClick={handleLogout} className="text-red-400 text-center py-2">🚪 خروج</button>
+                </>
+              )}
+              {!userType && (
+                <Link href="/login" onClick={() => setIsOpen(false)} className="gradient-primary text-center px-6 py-2 rounded-xl text-white font-medium">
+                  🔐 دخول
+                </Link>
+              )}
             </div>
           </div>
         )}
