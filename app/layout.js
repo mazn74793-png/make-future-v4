@@ -1,5 +1,5 @@
 import './globals.css';
-import { Toaster } from 'react-hot-toast';
+import ToasterProvider from '@/components/ToasterProvider';
 
 export const metadata = {
   title: 'منصة تعليمية',
@@ -10,16 +10,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ar" dir="rtl">
       <body>
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: '#1a1a2e',
-              color: '#fff',
-              border: '1px solid rgba(108, 92, 231, 0.3)',
-            },
-          }}
-        />
+        <ToasterProvider />
         {children}
       </body>
     </html>
