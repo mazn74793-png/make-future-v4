@@ -61,6 +61,8 @@ export default function DashboardLayout({ children }) {
     { href: '/dashboard/testimonials', label: 'اراء الطلاب' },
     { href: '/dashboard/announcements', label: 'الاعلانات' },
     { href: '/dashboard/settings', label: 'الاعدادات' },
+    // في الـ menu array ضيف:
+    { href: '/dashboard/exams', label: 'الامتحانات' },
   ];
 
   return (
