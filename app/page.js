@@ -10,10 +10,12 @@ export default async function HomePage() {
   const { data: courses } = await supabase.from('courses').select('*').eq('is_published', true).order('order').limit(6);
   const { data: testimonials } = await supabase.from('testimonials').select('*').eq('is_visible', true).order('order').limit(6);
   const { data: announcements } = await supabase.from('announcements').select('*').eq('is_active', true);
-  // بدل الـ static stats في الـ page.js ضيف ده في الأول
-const { count: studentsCount } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('status', 'approved');
-const { count: videosCount } = await supabase.from('videos').select('*', { count: 'exact', head: true });
-const { count: coursesCount } = await supabase.from('courses').select('*', { count: 'exact', head: true }).eq('is_published', true);
+  const { data: studentsData } = await supabase.from('students').select('id').eq('status', 'approved');
+  const { data: videosData } = await supabase.from('videos').select('id');
+  const { data: coursesData } = await supabase.from('courses').select('id').eq('is_published', true);
+  const studentsCount = studentsData?.length || 0;
+  const videosCount = videosData?.length || 0;
+  const coursesCount = coursesData?.length || 0;
 
   if (settings?.is_maintenance) {
     return (
@@ -54,10 +56,13 @@ const { count: coursesCount } = await supabase.from('courses').select('*', { cou
             <img src={settings.teacher_image_url} alt={settings.teacher_name}
               className="w-24 h-24 rounded-full mx-auto mb-6 border-4 border-purple-500 animate-fade-in" />
           )}
-
           <div className="inline-flex items-center gap-2 glass px-4 py-2 rounded-full mb-8 animate-fade-in">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-sm text-gray-300">{settings?.teacher_name || 'المدرس'} {settings?.subject ? `• ${settings.subject}` : ''} {settings?.stage ? `• ${settings.stage}` : ''}</span>
+            <span className="text-sm text-gray-300">
+              {settings?.teacher_name || 'المدرس'}
+              {settings?.subject ? ` • ${settings.subject}` : ''}
+              {settings?.stage ? ` • ${settings.stage}` : ''}
+            </span>
           </div>
 
           <h1 className="text-4xl md:text-7xl font-black mb-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
@@ -72,7 +77,7 @@ const { count: coursesCount } = await supabase.from('courses').select('*', { cou
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.6s' }}>
-            <Link href="/courses" className="gradient-primary px-8 py-4 rounded-2xl text-white font-bold text-lg hover:opacity-90 transition animate-glow flex items-center justify-center gap-2">
+            <Link href="/login" className="gradient-primary px-8 py-4 rounded-2xl text-white font-bold text-lg hover:opacity-90 transition animate-glow flex items-center justify-center gap-2">
               <FiPlay /> ابدأ التعلم
             </Link>
             {settings?.whatsapp_number && (
@@ -85,10 +90,10 @@ const { count: coursesCount } = await supabase.from('courses').select('*', { cou
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-16 animate-fade-in" style={{ animationDelay: '0.8s' }}>
             {[
-              { number: `+${studentsCount || 0}`, label: 'طالب' },
-{ number: `+${videosCount || 0}`, label: 'فيديو' },
-{ number: `+${coursesCount || 0}`, label: 'كورس' },
-{ number: settings?.stats_rating || '4.9', label: 'تقييم' },
+              { number: `+${studentsCount}`, label: 'طالب' },
+              { number: `+${videosCount}`, label: 'فيديو' },
+              { number: `+${coursesCount}`, label: 'كورس' },
+              { number: settings?.stats_rating || '4.9', label: 'تقييم' },
             ].map((stat, i) => (
               <div key={i} className="text-center">
                 <div className="text-2xl md:text-4xl font-black bg-gradient-to-l from-purple-400 to-pink-400 bg-clip-text text-transparent">{stat.number}</div>
@@ -130,7 +135,7 @@ const { count: coursesCount } = await supabase.from('courses').select('*', { cou
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {courses.map((course, i) => (
-                <Link href={`/courses/${course.id}`} key={course.id}>
+                <Link href="/login" key={course.id}>
                   <div className="gradient-card rounded-2xl overflow-hidden card-hover border border-white/5 animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
                     <div className="relative h-48">
                       {course.thumbnail_url ? (
@@ -156,7 +161,9 @@ const { count: coursesCount } = await supabase.from('courses').select('*', { cou
               ))}
             </div>
             <div className="text-center mt-8">
-              <Link href="/courses" className="glass px-8 py-3 rounded-xl text-white hover:bg-white/10 transition inline-block">عرض كل الكورسات ←</Link>
+              <Link href="/login" className="gradient-primary px-8 py-3 rounded-xl text-white font-bold hover:opacity-90 transition inline-block">
+                سجل دخول لمشاهدة الكورسات ←
+              </Link>
             </div>
           </div>
         </section>
