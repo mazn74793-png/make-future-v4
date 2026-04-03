@@ -1,132 +1,109 @@
-'use client'
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+'use client';
+import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function RegisterPage() {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(''); // رسالة الخطوة الحالية
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const [form, setForm] = useState({
     name: '', email: '', phone: '', parent_phone: '', stage: '', school: '', password: ''
-  })
+  });
 
   const handleRegister = async () => {
     if (!form.name || !form.email || !form.password) {
-      setError('من فضلك اكمل الاسم والايميل وكلمة المرور')
-      return
+      setError('من فضلك اكمل الاسم والايميل وكلمة المرور');
+      return;
     }
-    setLoading(true)
-    setError('')
+    if (form.password.length < 6) { setError('كلمة المرور لازم 6 أحرف على الأقل'); return; }
 
-    // 1. إنشاء حساب في Supabase Auth
+    setLoading(true);
+    setError('');
+    setStep('جاري إنشاء الحساب...');
+
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-    })
+      email: form.email, password: form.password,
+    });
 
     if (signUpError) {
-      if (signUpError.message.includes('already registered')) {
-        setError('الإيميل ده مسجّل بالفعل، جرّب تسجيل الدخول')
-      } else {
-        setError(signUpError.message)
-      }
-      setLoading(false)
-      return
+      setError(signUpError.message.includes('already registered')
+        ? 'الإيميل ده مسجّل بالفعل، جرّب تسجيل الدخول'
+        : signUpError.message);
+      setLoading(false); setStep(''); return;
     }
 
-    // 2. إضافة بيانات الطالب في students
-    // upsert عشان لو الأدمن كان ضايف الإيميل يدوياً قبل كده
-    const { error: insertError } = await supabase
-      .from('students')
-      .upsert({
-        user_id: data.user?.id,
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
-        parent_phone: form.parent_phone,
-        stage: form.stage,
-        school: form.school,
-        status: 'pending',
-      }, { onConflict: 'email' })
+    setStep('جاري حفظ بياناتك...');
+
+    const { error: insertError } = await supabase.from('students').upsert({
+      user_id: data.user?.id,
+      name: form.name, email: form.email,
+      phone: form.phone, parent_phone: form.parent_phone,
+      stage: form.stage, school: form.school,
+      status: 'pending', profile_complete: true,
+    }, { onConflict: 'email' });
 
     if (insertError) {
-      if (insertError.message.includes('duplicate')) {
-        setError('الإيميل ده مسجّل بالفعل، جرّب تسجيل الدخول')
-      } else {
-        setError(insertError.message)
-      }
-      setLoading(false)
-      return
+      setError(insertError.message);
+      setLoading(false); setStep(''); return;
     }
 
-    // 3. logout فوراً — ميدخلش غير بعد الـ approval
-    await supabase.auth.signOut()
-    setSuccess(true)
-    setLoading(false)
-  }
+    setStep('تم! جاري الإنهاء...');
+    await supabase.auth.signOut();
+    setSuccess(true);
+    setLoading(false); setStep('');
+  };
 
   if (success) return (
     <div className="min-h-screen flex items-center justify-center gradient-dark" dir="rtl">
-      <div className="glass rounded-2xl p-10 text-center max-w-md">
-        <div className="text-6xl mb-4">⏳</div>
+      <div className="glass rounded-2xl p-10 text-center max-w-md animate-fade-in">
+        <div className="text-6xl mb-4">✅</div>
         <h2 className="text-2xl font-black mb-2">طلبك اتبعت!</h2>
-        <p className="text-gray-400">الأدمن هيراجع طلبك وهيتواصل معاك قريباً</p>
-        <a href="/login" className="mt-6 inline-block text-purple-400 underline">رجوع لتسجيل الدخول</a>
+        <p className="text-gray-400 mb-6">الأدمن هيراجع طلبك وهيتواصل معاك قريباً</p>
+        <a href="/login" className="gradient-primary px-8 py-3 rounded-xl text-white font-bold inline-block">
+          رجوع لتسجيل الدخول
+        </a>
       </div>
     </div>
-  )
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center gradient-dark px-4" dir="rtl">
       <div className="glass rounded-2xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-black mb-6 text-center">إنشاء حساب جديد</h1>
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-black">إنشاء حساب جديد</h1>
+          <p className="text-gray-400 text-sm mt-1">سجّل وانتظر موافقة الأدمن</p>
+        </div>
 
-        {error && (
-          <div className="bg-red-500/20 text-red-400 p-3 rounded-xl mb-4 text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="bg-red-500/20 text-red-400 p-3 rounded-xl mb-4 text-sm">{error}</div>}
 
-        <div className="space-y-4">
-          <input type="text" placeholder="الاسم الكامل *"
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none"
-            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-
-          <input type="email" placeholder="البريد الإلكتروني *"
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none"
-            value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-
-          <input type="password" placeholder="كلمة المرور *"
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none"
-            value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-
-          <input type="tel" placeholder="رقم الموبايل"
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none"
-            value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-
-          <input type="tel" placeholder="رقم ولي الأمر"
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none"
-            value={form.parent_phone} onChange={e => setForm({ ...form, parent_phone: e.target.value })} />
-
-          <input type="text" placeholder="المرحلة الدراسية"
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none"
-            value={form.stage} onChange={e => setForm({ ...form, stage: e.target.value })} />
-
-          <input type="text" placeholder="المدرسة"
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none"
-            value={form.school} onChange={e => setForm({ ...form, school: e.target.value })} />
+        <div className="space-y-3">
+          {[
+            { key: 'name', ph: 'الاسم الكامل *', type: 'text' },
+            { key: 'email', ph: 'البريد الإلكتروني *', type: 'email' },
+            { key: 'password', ph: 'كلمة المرور * (6 أحرف على الأقل)', type: 'password' },
+            { key: 'phone', ph: 'رقم الموبايل', type: 'tel' },
+            { key: 'parent_phone', ph: 'رقم ولي الأمر', type: 'tel' },
+            { key: 'stage', ph: 'المرحلة الدراسية', type: 'text' },
+            { key: 'school', ph: 'المدرسة', type: 'text' },
+          ].map(({ key, ph, type }) => (
+            <input key={key} type={type} placeholder={ph} value={form[key]}
+              onChange={e => setForm({ ...form, [key]: e.target.value })}
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none text-sm" />
+          ))}
 
           <button onClick={handleRegister} disabled={loading}
-            className="w-full gradient-primary py-3 rounded-xl text-white font-bold hover:opacity-90 disabled:opacity-50">
-            {loading ? '⏳ جارٍ الإرسال...' : 'إرسال طلب التسجيل'}
+            className="w-full gradient-primary py-3 rounded-xl text-white font-bold hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{step || 'جاري...'}</>
+            ) : 'إرسال طلب التسجيل'}
           </button>
         </div>
 
         <p className="text-center text-sm text-gray-400 mt-4">
-          عندك حساب؟{' '}
-          <a href="/login" className="text-purple-400 font-semibold">سجل دخول</a>
+          عندك حساب؟ <a href="/login" className="text-purple-400 font-semibold">سجل دخول</a>
         </p>
       </div>
     </div>
-  )
+  );
 }
