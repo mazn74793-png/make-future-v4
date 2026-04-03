@@ -9,10 +9,10 @@ export default function StudentsPage() {
   const [pending, setPending] = useState([]);
   const [accessRequests, setAccessRequests] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [approvingAll, setApprovingAll] = useState(false);
   const [changingPassword, setChangingPassword] = useState(null);
   const [newPassword, setNewPassword] = useState('');
   const [form, setForm] = useState({ name: '', email: '', phone: '', parent_phone: '', stage: '', school: '' });
-  const [approvingAll, setApprovingAll] = useState(false); // حالة قبول الكل
 
   const load = async () => {
     const { data: approved } = await supabase.from('students').select('*').eq('status', 'approved').order('created_at', { ascending: false });
@@ -38,6 +38,16 @@ export default function StudentsPage() {
     await supabase.from('students').update({ status }).eq('id', id);
     toast.success(status === 'approved' ? '✅ تم القبول' : '❌ تم الرفض');
     load();
+  };
+
+  const approveAll = async () => {
+    if (pending.length === 0) return;
+    setApprovingAll(true);
+    const ids = pending.map(s => s.id);
+    await supabase.from('students').update({ status: 'approved' }).in('id', ids);
+    toast.success(`✅ تم قبول ${ids.length} طالب`);
+    load();
+    setApprovingAll(false);
   };
 
   const handleAccessRequest = async (id, status) => {
@@ -70,40 +80,29 @@ export default function StudentsPage() {
     toast.success('اتمسح'); load();
   };
 
-  // وظيفة لقبول جميع الطلبات
-  const approveAll = async () => {
-    setApprovingAll(true);
-    const ids = pending.map(s => s.id);
-    await supabase.from('students').update({ status: 'approved' }).in('id', ids);
-    toast.success(`✅ تم قبول ${ids.length} طالب`);
-    load();
-    setApprovingAll(false);
-  };
-
   return (
-    <div>
-      {/* قسم قبول الكل قبل قائمة الطلبات */}
-      {pending.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-yellow-400 flex items-center gap-2">
-              ⏳ طلبات تسجيل جديدة
-              <span className="bg-yellow-400/20 text-yellow-400 text-sm px-3 py-1 rounded-full">{pending.length}</span>
-            </h2>
-            {pending.length > 1 && (
-              <button
-                onClick={approveAll}
-                disabled={approvingAll}
-                className="bg-green-500/20 text-green-400 px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-2"
-              >
-                {approvingAll ? '⏳' : '✅'} قبول الكل ({pending.length})
-              </button>
-            )}
+    <div dir="rtl">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-black">ادارة الطلاب</h1>
+        <button onClick={() => setShowForm(!showForm)}
+          className="gradient-primary px-6 py-3 rounded-xl text-white font-bold flex items-center gap-2">
+          <FiPlus /> {showForm ? 'إلغاء' : 'طالب جديد'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="glass rounded-2xl p-6 mb-8 animate-fade-in space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[['name','اسم الطالب'],['email','الايميل'],['phone','الموبايل'],['parent_phone','ولي الأمر'],['stage','المرحلة'],['school','المدرسة']].map(([key, ph]) => (
+              <input key={key} type={key === 'email' ? 'email' : 'text'} value={form[key]}
+                onChange={e => setForm({ ...form, [key]: e.target.value })} placeholder={ph}
+                className="bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
+            ))}
           </div>
+          <button onClick={handleAdd} className="gradient-primary px-8 py-3 rounded-xl text-white font-bold">اضافة الطالب</button>
         </div>
       )}
 
-      {/* باقي محتوى الصفحة */}
       {/* طلبات الوصول للكورسات */}
       {accessRequests.length > 0 && (
         <div className="mb-8">
@@ -138,21 +137,18 @@ export default function StudentsPage() {
       {/* طلبات تسجيل جديدة */}
       {pending.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4 text-yellow-400 flex items-center gap-2">
-            ⏳ طلبات تسجيل جديدة
-            <span className="bg-yellow-400/20 text-yellow-400 text-sm px-3 py-1 rounded-full">{pending.length}</span>
-          </h2>
-          {/* هنا زر قبول الكل */}
-          <div className="mb-4">
-            <button
-              onClick={approveAll}
-              disabled={approvingAll}
-              className="bg-green-500/20 text-green-400 px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-2"
-            >
-              {approvingAll ? '⏳' : '✅'} قبول الكل ({pending.length})
-            </button>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-yellow-400 flex items-center gap-2">
+              ⏳ طلبات تسجيل جديدة
+              <span className="bg-yellow-400/20 text-yellow-400 text-sm px-3 py-1 rounded-full">{pending.length}</span>
+            </h2>
+            {pending.length > 1 && (
+              <button onClick={approveAll} disabled={approvingAll}
+                className="bg-green-500/20 text-green-400 px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-2">
+                {approvingAll ? '⏳' : '✅'} قبول الكل ({pending.length})
+              </button>
+            )}
           </div>
-          {/* عرض الطلبات */}
           <div className="space-y-3">
             {pending.map(s => (
               <div key={s.id} className="glass rounded-xl p-4 flex items-center gap-4 border border-yellow-400/20">
@@ -180,20 +176,19 @@ export default function StudentsPage() {
       <h2 className="text-xl font-bold mb-4">الطلاب المقبولين ({students.length})</h2>
       <div className="space-y-3">
         {students.map(s => (
-          <div key={s.id} className="glass rounded-xl p-4 flex items-center gap-4 card-hover">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${s.is_active ? 'gradient-primary' : 'bg-white/10'}`}>
+          <div key={s.id} className="glass rounded-xl p-4 flex items-center gap-3 flex-wrap card-hover">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0 ${s.is_active ? 'gradient-primary' : 'bg-white/10'}`}>
               {s.name?.[0]}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <h3 className="font-bold">{s.name}</h3>
-              <p className="text-gray-500 text-sm">{s.email} {s.phone && `- ${s.phone}`}</p>
+              <p className="text-gray-500 text-sm truncate">{s.email} {s.phone && `- ${s.phone}`}</p>
               {s.stage && <p className="text-gray-600 text-xs">{s.stage}</p>}
             </div>
-            <span className={`text-xs px-3 py-1 rounded-full ${s.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+            <span className={`text-xs px-3 py-1 rounded-full flex-shrink-0 ${s.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
               {s.is_active ? 'نشط' : 'معطل'}
             </span>
 
-            {/* تغيير الباسورد */}
             {changingPassword === s.id ? (
               <div className="flex items-center gap-2">
                 <input type="password" placeholder="باسورد جديد" value={newPassword}
@@ -206,15 +201,17 @@ export default function StudentsPage() {
               </div>
             ) : (
               <button onClick={() => setChangingPassword(s.id)}
-                className="p-2 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition" title="تغيير الباسورد">
+                className="p-2 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition flex-shrink-0" title="تغيير الباسورد">
                 <FiKey />
               </button>
             )}
 
-            <button onClick={() => toggleActive(s.id, s.is_active)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition">
+            <button onClick={() => toggleActive(s.id, s.is_active)}
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition flex-shrink-0">
               {s.is_active ? <FiUserX className="text-yellow-400" /> : <FiUserCheck className="text-green-400" />}
             </button>
-            <button onClick={() => handleDelete(s.id, s.name)} className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition">
+            <button onClick={() => handleDelete(s.id, s.name)}
+              className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition flex-shrink-0">
               <FiTrash2 />
             </button>
           </div>
