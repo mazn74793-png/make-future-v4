@@ -85,12 +85,11 @@ export default function StudentPage() {
   const enrolledCourses = courses.filter(c => enrollments.includes(c.id) || c.visibility === 'public');
   const availableCourses = courses.filter(c => !enrollments.includes(c.id) && c.visibility !== 'public');
 
-  // أضفت الـ tab الخاص بالمنتجات هنا
   const tabs = [
     { key: 'home', label: '🏠 الرئيسية' },
     { key: 'courses', label: `📚 الكورسات${enrolledCourses.length > 0 ? ` (${enrolledCourses.length})` : ''}` },
     { key: 'exams', label: `📝 الامتحانات${exams.length > 0 ? ` (${exams.length})` : ''}` },
-    { key: 'products', label: '📦 المنتجات' }, // التعديل هنا
+    { key: 'products', label: '📦 المنتجات' },
   ];
 
   return (
@@ -123,36 +122,104 @@ export default function StudentPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
-
         {/* ===== HOME TAB ===== */}
         {activeTab === 'home' && (
           <div className="space-y-6">
-            {/* المحتوى الخاص بالصفحة الرئيسية هنا */}
-            {/* ... (نفس الكود السابق) ... */}
+            <h2 className="text-xl font-bold mb-4">مرحبا بك {student?.name}</h2>
+            {/* محتوى الصفحة الرئيسية */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-4 rounded shadow">
+                <div className="flex items-center space-x-2 mb-2">
+                  <FiBookOpen className="text-xl" />
+                  <h3 className="font-bold">الكورسات</h3>
+                </div>
+                <p>عدد الكورسات: {stats.courses}</p>
+              </div>
+              <div className="bg-white p-4 rounded shadow">
+                <div className="flex items-center space-x-2 mb-2">
+                  <FiFileText className="text-xl" />
+                  <h3 className="font-bold">الامتحانات</h3>
+                </div>
+                <p>عدد الامتحانات: {stats.exams}</p>
+              </div>
+              <div className="bg-white p-4 rounded shadow">
+                <div className="flex items-center space-x-2 mb-2">
+                  <FiPlay className="text-xl" />
+                  <h3 className="font-bold">الفيديوهات</h3>
+                </div>
+                <p>عدد الفيديوهات: {stats.videos}</p>
+              </div>
+            </div>
           </div>
         )}
 
         {/* ===== COURSES TAB ===== */}
         {activeTab === 'courses' && (
           <div className="space-y-8">
-            {/* محتوى الكورسات هنا */}
-            {/* ... (نفس الكود السابق) ... */}
+            <h2 className="text-xl font-bold mb-4">الكورسات المتاحة</h2>
+            {enrolledCourses.length === 0 ? (
+              <p>ليس لديك كورسات حالياً.</p>
+            ) : (
+              enrolledCourses.map(course => (
+                <div key={course.id} className="bg-white p-4 rounded shadow mb-4">
+                  <h3 className="font-bold mb-2">{course.title}</h3>
+                  <p>{course.description}</p>
+                </div>
+              ))
+            )}
+            {availableCourses.length > 0 && (
+              <>
+                <h2 className="text-xl font-bold mb-4">كورسات جديدة</h2>
+                {availableCourses.map(course => (
+                  <div key={course.id} className="bg-white p-4 rounded shadow mb-4 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold mb-2">{course.title}</h3>
+                      <p>{course.description}</p>
+                    </div>
+                    <button
+                      disabled={getRequestStatus(course.id) === 'pending'}
+                      onClick={() => handleRequest(course.id)}
+                      className={`px-4 py-2 rounded ${getRequestStatus(course.id) === 'pending' ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'} text-white`}>
+                      {getRequestStatus(course.id) === 'pending' ? 'قيد الانتظار' : 'طلب وصول'}
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
 
         {/* ===== EXAMS TAB ===== */}
         {activeTab === 'exams' && (
           <div>
-            {/* محتوى الامتحانات هنا */}
-            {/* ... (نفس الكود السابق) ... */}
+            <h2 className="text-xl font-bold mb-4">الامتحانات</h2>
+            {exams.length === 0 ? (
+              <p>لا توجد امتحانات حالياً.</p>
+            ) : (
+              exams.map(exam => {
+                const attempt = getExamAttempt(exam.id);
+                return (
+                  <div key={exam.id} className="bg-white p-4 rounded shadow mb-4">
+                    <h3 className="font-bold mb-2">{exam.title}</h3>
+                    <p>الدرجة: {attempt?.percentage ?? 0}%</p>
+                    <button className="mt-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+                      ابدأ الامتحان
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
         {/* ===== المنتجات TAB ===== */}
         {activeTab === 'products' && (
-          <StudentProducts student={student} />
+          <div>
+            {/* استبدل بـ مكون المنتجات الخاص بك أو المحتوى المناسب */}
+            <h2 className="text-xl font-bold mb-4">منتجات الطلاب</h2>
+            <p>هنا يمكنك عرض منتجات الطلاب أو الطلبات.</p>
+          </div>
         )}
-
       </div>
     </div>
   );
