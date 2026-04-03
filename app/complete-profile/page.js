@@ -17,29 +17,37 @@ export default function CompleteProfilePage() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!form.name || !form.phone || !form.stage) { setError('من فضلك اكمل كل البيانات المطلوبة'); return; }
+    if (!form.name || !form.phone || !form.stage) { setError('من فضلك اكمل الاسم والموبايل والمرحلة'); return; }
     if (form.password && form.password !== form.confirmPassword) { setError('كلمتا المرور مش متطابقتين'); return; }
-    if (form.password && form.password.length < 6) { setError('كلمة المرور لازم تكون 6 أحرف على الأقل'); return; }
+    if (form.password && form.password.length < 6) { setError('كلمة المرور لازم 6 أحرف على الأقل'); return; }
     setLoading(true);
     setError('');
 
-    // تحديث الباسورد لو اتكتب
     if (form.password) {
       await supabase.auth.updateUser({ password: form.password });
     }
 
-    // إضافة أو تحديث الـ profile
-    const { error: upsertError } = await supabase.from('students').upsert({
-      user_id: user.id,
-      name: form.name,
-      email: user.email,
-      phone: form.phone,
-      parent_phone: form.parent_phone,
-      stage: form.stage,
-      school: form.school,
-      status: 'pending',
-      profile_complete: true,
-    }, { onConflict: 'user_id' });
+    // لو الطالب موجود بالإيميل — نعمل update، لو لا — نعمل insert
+    const { data: existing } = await supabase
+      .from('students').select('id').eq('email', user.email).single();
+
+    let upsertError;
+    if (existing) {
+      const { error } = await supabase.from('students').update({
+        user_id: user.id, name: form.name, phone: form.phone,
+        parent_phone: form.parent_phone, stage: form.stage,
+        school: form.school, profile_complete: true,
+      }).eq('email', user.email);
+      upsertError = error;
+    } else {
+      const { error } = await supabase.from('students').insert({
+        user_id: user.id, name: form.name, email: user.email,
+        phone: form.phone, parent_phone: form.parent_phone,
+        stage: form.stage, school: form.school,
+        status: 'pending', profile_complete: true,
+      });
+      upsertError = error;
+    }
 
     if (upsertError) { setError(upsertError.message); setLoading(false); return; }
 
@@ -58,7 +66,7 @@ export default function CompleteProfilePage() {
 
         {error && <div className="bg-red-500/20 text-red-400 p-3 rounded-xl mb-4 text-sm">{error}</div>}
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <input type="text" placeholder="الاسم الكامل *" value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value })}
             className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
@@ -75,11 +83,11 @@ export default function CompleteProfilePage() {
             onChange={e => setForm({ ...form, school: e.target.value })}
             className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
 
-          <div className="border-t border-white/10 pt-4">
-            <p className="text-gray-400 text-xs mb-3">اختياري — تحديد باسورد للدخول بالإيميل</p>
+          <div className="border-t border-white/10 pt-3">
+            <p className="text-gray-400 text-xs mb-2">اختياري — تحديد باسورد للدخول بالإيميل</p>
             <input type="password" placeholder="باسورد (اختياري)" value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none mb-3" />
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none mb-2" />
             {form.password && (
               <input type="password" placeholder="تأكيد الباسورد" value={form.confirmPassword}
                 onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
