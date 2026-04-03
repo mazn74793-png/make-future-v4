@@ -89,6 +89,7 @@ export default function StudentPage() {
     { key: 'home', label: '🏠 الرئيسية' },
     { key: 'courses', label: `📚 الكورسات${enrolledCourses.length > 0 ? ` (${enrolledCourses.length})` : ''}` },
     { key: 'exams', label: `📝 الامتحانات${exams.length > 0 ? ` (${exams.length})` : ''}` },
+    { key: 'products', label: '📦 المنتجات' },
   ];
 
   return (
