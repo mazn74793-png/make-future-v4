@@ -12,6 +12,7 @@ export default function StudentsPage() {
   const [changingPassword, setChangingPassword] = useState(null);
   const [newPassword, setNewPassword] = useState('');
   const [form, setForm] = useState({ name: '', email: '', phone: '', parent_phone: '', stage: '', school: '' });
+  const [approvingAll, setApprovingAll] = useState(false); // حالة قبول الكل
 
   const load = async () => {
     const { data: approved } = await supabase.from('students').select('*').eq('status', 'approved').order('created_at', { ascending: false });
@@ -69,28 +70,40 @@ export default function StudentsPage() {
     toast.success('اتمسح'); load();
   };
 
+  // وظيفة لقبول جميع الطلبات
+  const approveAll = async () => {
+    setApprovingAll(true);
+    const ids = pending.map(s => s.id);
+    await supabase.from('students').update({ status: 'approved' }).in('id', ids);
+    toast.success(`✅ تم قبول ${ids.length} طالب`);
+    load();
+    setApprovingAll(false);
+  };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-black">ادارة الطلاب</h1>
-        <button onClick={() => setShowForm(!showForm)}
-          className="gradient-primary px-6 py-3 rounded-xl text-white font-bold flex items-center gap-2">
-          <FiPlus /> {showForm ? 'الغاء' : 'طالب جديد'}
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="glass rounded-2xl p-6 mb-8 animate-fade-in space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[['name','اسم الطالب'],['email','الايميل'],['phone','الموبايل'],['parent_phone','ولي الأمر'],['stage','المرحلة'],['school','المدرسة']].map(([key, ph]) => (
-              <input key={key} type={key==='email'?'email':'text'} value={form[key]} onChange={e => setForm({...form,[key]:e.target.value})}
-                placeholder={ph} className="bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
-            ))}
+      {/* قسم قبول الكل قبل قائمة الطلبات */}
+      {pending.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-yellow-400 flex items-center gap-2">
+              ⏳ طلبات تسجيل جديدة
+              <span className="bg-yellow-400/20 text-yellow-400 text-sm px-3 py-1 rounded-full">{pending.length}</span>
+            </h2>
+            {pending.length > 1 && (
+              <button
+                onClick={approveAll}
+                disabled={approvingAll}
+                className="bg-green-500/20 text-green-400 px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-2"
+              >
+                {approvingAll ? '⏳' : '✅'} قبول الكل ({pending.length})
+              </button>
+            )}
           </div>
-          <button onClick={handleAdd} className="gradient-primary px-8 py-3 rounded-xl text-white font-bold">اضافة الطالب</button>
         </div>
       )}
 
+      {/* باقي محتوى الصفحة */}
       {/* طلبات الوصول للكورسات */}
       {accessRequests.length > 0 && (
         <div className="mb-8">
@@ -129,6 +142,17 @@ export default function StudentsPage() {
             ⏳ طلبات تسجيل جديدة
             <span className="bg-yellow-400/20 text-yellow-400 text-sm px-3 py-1 rounded-full">{pending.length}</span>
           </h2>
+          {/* هنا زر قبول الكل */}
+          <div className="mb-4">
+            <button
+              onClick={approveAll}
+              disabled={approvingAll}
+              className="bg-green-500/20 text-green-400 px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-500/30 disabled:opacity-50 flex items-center gap-2"
+            >
+              {approvingAll ? '⏳' : '✅'} قبول الكل ({pending.length})
+            </button>
+          </div>
+          {/* عرض الطلبات */}
           <div className="space-y-3">
             {pending.map(s => (
               <div key={s.id} className="glass rounded-xl p-4 flex items-center gap-4 border border-yellow-400/20">
