@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { useParams } from 'next/navigation';
-import { FiPlus, FiTrash2, FiImage, FiArrowRight } from 'react-icons/fi';
+import { FiPlus, FiTrash2, FiImage, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 
 export default function ExamDetailPage() {
   const { id } = useParams();
@@ -32,16 +32,27 @@ export default function ExamDetailPage() {
 
   const handleImageUpload = async (file) => {
     setUploading(true);
-    const res = await fetch('/api/presign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: file.name, contentType: file.type, title: 'exam-img', courseId: 'exam', isFree: true, fileSize: file.size })
-    });
-    const { uploadUrl, videoUrl } = await res.json();
-    await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
-    setForm(f => ({ ...f, image_url: videoUrl }));
+    try {
+      const res = await fetch('/api/upload-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, contentType: file.type })
+      });
+      const { uploadUrl, imageUrl, error } = await res.json();
+      if (error) { toast.error(error); setUploading(false); return; }
+
+      await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
+
+      setForm(f => ({ ...f, image_url: imageUrl }));
+      toast.success('✅ الصورة اترفعت');
+    } catch {
+      toast.error('حصل مشكلة في رفع الصورة');
+    }
     setUploading(false);
-    toast.success('✅ الصورة اترفعت');
   };
 
   const handleAddQuestion = async () => {
@@ -73,6 +84,12 @@ export default function ExamDetailPage() {
     toast.success('اتمسح'); load();
   };
 
+  const toggleActive = async () => {
+    await supabase.from('exams').update({ is_active: !exam.is_active }).eq('id', id);
+    toast.success(!exam.is_active ? '✅ الامتحان متاح للطلاب' : '🔒 الامتحان مقفول');
+    load();
+  };
+
   if (!exam) return (
     <div className="flex items-center justify-center py-20">
       <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -81,15 +98,20 @@ export default function ExamDetailPage() {
 
   return (
     <div dir="rtl">
-      <div className="flex items-center gap-4 mb-8">
-        <a href="/dashboard/exams" className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition text-white">←</a>
-        <div>
-          <h1 className="text-2xl font-black">{exam.title}</h1>
-          <p className="text-gray-400 text-sm">{exam.duration_minutes} دقيقة • {questions.length} سؤال • نجاح من {exam.pass_score}%</p>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <a href="/dashboard/exams" className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition text-white">←</a>
+          <div>
+            <h1 className="text-2xl font-black">{exam.title}</h1>
+            <p className="text-gray-400 text-sm">{exam.duration_minutes} دقيقة • {questions.length} سؤال • نجاح من {exam.pass_score}%</p>
+          </div>
         </div>
+        <button onClick={toggleActive}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${exam.is_active ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'}`}>
+          {exam.is_active ? <><FiToggleRight className="text-xl" /> متاح</> : <><FiToggleLeft className="text-xl" /> مقفول</>}
+        </button>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-3 mb-6">
         {[
           { key: 'questions', label: `الأسئلة (${questions.length})` },
@@ -122,7 +144,8 @@ export default function ExamDetailPage() {
                 </div>
                 <div>
                   <label className="text-sm text-gray-400 mb-1 block">الدرجة</label>
-                  <input type="number" value={form.points} onChange={e => setForm({ ...form, points: parseInt(e.target.value) })} min="1"
+                  <input type="number" value={form.points} min="1"
+                    onChange={e => setForm({ ...form, points: parseInt(e.target.value) })}
                     className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
                 </div>
               </div>
@@ -134,30 +157,34 @@ export default function ExamDetailPage() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none resize-none" />
               </div>
 
-              {/* رفع صورة */}
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">صورة مع السؤال (اختياري)</label>
-                <div className="flex items-center gap-3">
-                  <input type="file" accept="image/*" onChange={e => e.target.files[0] && handleImageUpload(e.target.files[0])}
-                    className="hidden" id="imgUpload" />
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input type="file" accept="image/*" id="imgUpload" className="hidden"
+                    onChange={e => e.target.files[0] && handleImageUpload(e.target.files[0])} />
                   <label htmlFor="imgUpload"
-                    className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-xl cursor-pointer hover:bg-white/10 transition text-sm">
-                    <FiImage /> {uploading ? 'جاري الرفع...' : 'رفع صورة'}
+                    className={`flex items-center gap-2 border border-white/10 px-4 py-2 rounded-xl cursor-pointer hover:bg-white/10 transition text-sm ${uploading ? 'opacity-50 cursor-not-allowed' : 'bg-white/5'}`}>
+                    <FiImage /> {uploading ? '⏳ جاري الرفع...' : 'رفع صورة'}
                   </label>
-                  {form.image_url && <img src={form.image_url} alt="preview" className="w-16 h-16 rounded-xl object-cover" />}
+                  {form.image_url && (
+                    <div className="flex items-center gap-2">
+                      <img src={form.image_url} alt="preview" className="w-16 h-16 rounded-xl object-cover" />
+                      <button onClick={() => setForm(f => ({ ...f, image_url: '' }))}
+                        className="text-red-400 text-xs hover:text-red-300">حذف</button>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {form.type === 'mcq' && (
                 <div>
-                  <label className="text-sm text-gray-400 mb-2 block">الاختيارات</label>
+                  <label className="text-sm text-gray-400 mb-2 block">الاختيارات — اضغط الدائرة للإجابة الصحيحة</label>
                   <div className="space-y-2">
                     {form.options.map((opt, i) => (
                       <div key={i} className="flex items-center gap-3">
-                        <input type="radio" name="correct" value={opt}
-                          checked={form.correct_answer === opt}
-                          onChange={() => form.options[i] && setForm({ ...form, correct_answer: form.options[i] })}
-                          className="accent-purple-500 w-4 h-4" />
+                        <input type="radio" name="correct" checked={form.correct_answer === opt && opt !== ''}
+                          onChange={() => opt && setForm({ ...form, correct_answer: opt })}
+                          className="accent-purple-500 w-4 h-4 flex-shrink-0" />
                         <input type="text" value={opt}
                           onChange={e => {
                             const newOpts = [...form.options];
@@ -168,8 +195,10 @@ export default function ExamDetailPage() {
                           className="flex-1 bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-white focus:border-purple-500 focus:outline-none text-sm" />
                       </div>
                     ))}
-                    <p className="text-xs text-gray-500">اضغط على الدائرة بجانب الإجابة الصحيحة</p>
                   </div>
+                  {form.correct_answer && (
+                    <p className="text-green-400 text-xs mt-2">✅ الإجابة الصحيحة: {form.correct_answer}</p>
+                  )}
                 </div>
               )}
 
@@ -211,7 +240,7 @@ export default function ExamDetailPage() {
             ))}
             {questions.length === 0 && (
               <div className="glass rounded-2xl p-10 text-center">
-                <p className="text-gray-400">ضيف أسئلة للامتحان</p>
+                <p className="text-gray-400">ضيف أسئلة للامتحان 👆</p>
               </div>
             )}
           </div>
@@ -219,51 +248,51 @@ export default function ExamDetailPage() {
       )}
 
       {activeTab === 'results' && (
-        <div>
-          <div className="space-y-4">
-            {attempts.map(attempt => {
-              const passed = attempt.percentage >= exam.pass_score;
-              return (
-                <div key={attempt.id} className="glass rounded-xl p-5 border border-white/5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 gradient-primary rounded-full flex items-center justify-center font-bold text-white">
-                        {attempt.students?.name?.[0]}
-                      </div>
-                      <div>
-                        <p className="font-bold">{attempt.students?.name}</p>
-                        <p className="text-gray-400 text-xs">{attempt.students?.email}</p>
-                      </div>
+        <div className="space-y-4">
+          {attempts.map(attempt => {
+            const passed = attempt.percentage >= (exam?.pass_score || 50);
+            return (
+              <div key={attempt.id} className="glass rounded-xl p-5 border border-white/5">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 gradient-primary rounded-full flex items-center justify-center font-bold text-white">
+                      {attempt.students?.name?.[0]}
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <p className={`text-2xl font-black ${passed ? 'text-green-400' : 'text-red-400'}`}>
-                          {Math.round(attempt.percentage || 0)}%
-                        </p>
-                        <p className="text-xs text-gray-400">{attempt.score}/{attempt.total_points} درجة</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm text-gray-400">
-                          ⏱️ {attempt.time_taken_seconds ? `${Math.floor(attempt.time_taken_seconds / 60)}:${String(attempt.time_taken_seconds % 60).padStart(2, '0')}` : '-'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleDateString('ar-EG') : ''}
-                        </p>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-bold ${passed ? 'bg-green-400/20 text-green-400' : 'bg-red-400/20 text-red-400'}`}>
-                        {passed ? '✅ ناجح' : '❌ راسب'}
-                      </span>
+                    <div>
+                      <p className="font-bold">{attempt.students?.name}</p>
+                      <p className="text-gray-400 text-xs">{attempt.students?.email}</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-center">
+                      <p className={`text-2xl font-black ${passed ? 'text-green-400' : 'text-red-400'}`}>
+                        {Math.round(attempt.percentage || 0)}%
+                      </p>
+                      <p className="text-xs text-gray-400">{attempt.score}/{attempt.total_points} درجة</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-gray-400">
+                        ⏱️ {attempt.time_taken_seconds
+                          ? `${Math.floor(attempt.time_taken_seconds / 60)}:${String(attempt.time_taken_seconds % 60).padStart(2, '0')}`
+                          : '-'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {attempt.submitted_at ? new Date(attempt.submitted_at).toLocaleDateString('ar-EG') : ''}
+                      </p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${passed ? 'bg-green-400/20 text-green-400' : 'bg-red-400/20 text-red-400'}`}>
+                      {passed ? '✅ ناجح' : '❌ راسب'}
+                    </span>
+                  </div>
                 </div>
-              );
-            })}
-            {attempts.length === 0 && (
-              <div className="glass rounded-2xl p-10 text-center">
-                <p className="text-gray-400">مفيش نتائج لسه</p>
               </div>
-            )}
-          </div>
+            );
+          })}
+          {attempts.length === 0 && (
+            <div className="glass rounded-2xl p-10 text-center">
+              <p className="text-gray-400">مفيش نتائج لسه</p>
+            </div>
+          )}
         </div>
       )}
     </div>
