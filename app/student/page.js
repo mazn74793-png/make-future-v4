@@ -204,6 +204,17 @@ export default function StudentPage() {
               </div>
             </div>
 
+            {/* كود الطالب */}
+<div className="rounded-2xl p-4 flex items-center justify-between"
+  style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+  <div>
+    <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>كود الطالب الخاص بك</p>
+    <p className="text-2xl font-black font-mono tracking-widest" style={{ color: '#818cf8' }}>
+      {student?.student_code || '----'}
+    </p>
+  </div>
+  <div className="text-4xl">🎫</div>
+</div>
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
               {[
