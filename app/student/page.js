@@ -204,7 +204,7 @@ export default function StudentPage() {
               </div>
             </div>
 
-            {/* كود الطالب */}
+     {/* كود الطالب */}
 <div className="rounded-2xl p-4 flex items-center justify-between"
   style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
   <div>
@@ -213,7 +213,7 @@ export default function StudentPage() {
       {student?.student_code || '----'}
     </p>
   </div>
-  <div className="text-4xl">🎫</div>
+  <div className="text-4xl">💳</div>
 </div>
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
