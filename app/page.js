@@ -10,12 +10,12 @@ export default async function HomePage() {
   const { data: courses } = await supabase.from('courses').select('*').eq('is_published', true).order('order').limit(6);
   const { data: testimonials } = await supabase.from('testimonials').select('*').eq('is_visible', true).order('order').limit(6);
   const { data: announcements } = await supabase.from('announcements').select('*').eq('is_active', true);
-  const { data: studentsData } = await supabase.from('students').select('id').eq('status', 'approved');
-  const { data: videosData } = await supabase.from('videos').select('id');
-  const { data: coursesData } = await supabase.from('courses').select('id').eq('is_published', true);
-  const studentsCount = studentsData?.length || 0;
-  const videosCount = videosData?.length || 0;
-  const coursesCount = coursesData?.length || 0;
+
+  // الإحصائيات عن طريق function تتجاوز الـ RLS
+  const { data: statsData } = await supabase.rpc('get_public_stats');
+  const studentsCount = statsData?.students || 0;
+  const videosCount = statsData?.videos || 0;
+  const coursesCount = statsData?.courses || 0;
 
   if (settings?.is_maintenance) {
     return (
