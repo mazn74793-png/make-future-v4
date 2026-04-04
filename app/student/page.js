@@ -95,7 +95,7 @@ export default function StudentPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center gradient-dark">
+    <div className="min-h-screen flex items-center justify-center style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border)' }}">
       <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
@@ -113,7 +113,7 @@ export default function StudentPage() {
   const statusLabel = { pending: '⏳ قيد المراجعة', confirmed: '✅ تم التأكيد', delivered: '📦 تم التسليم', cancelled: '❌ ملغي' };
 
   return (
-    <div className="min-h-screen gradient-dark" dir="rtl">
+    
       {/* Header */}
       <div className="glass border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
