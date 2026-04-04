@@ -11,23 +11,33 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html {
+  /* منع الـ overflow الأفقي */
+  overflow-x: hidden;
+}
+
 body {
   font-family: 'Tajawal', sans-serif;
   direction: rtl;
   background: #0a0a0a;
   color: #ffffff;
+  overflow-x: hidden;
+  /* منع الـ text overflow */
+  word-break: break-word;
 }
 
-::-webkit-scrollbar { width: 8px; }
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #1a1a2e; }
 ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
 
+/* ===== Animations ===== */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-30px); }
+  from { opacity: 0; transform: translateX(-24px); }
   to { opacity: 1; transform: translateX(0); }
 }
 @keyframes glow {
@@ -36,33 +46,219 @@ body {
 }
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
 }
 
-.animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
+.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
 .animate-slide-in { animation: slideIn 0.5s ease-out forwards; }
 .animate-glow { animation: glow 2s ease-in-out infinite; }
 .animate-float { animation: float 3s ease-in-out infinite; }
 
-.gradient-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); }
-.gradient-dark { background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%); }
-.gradient-card { background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%); }
+/* ===== Gradients ===== */
+.gradient-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+}
+.gradient-dark {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+}
+.gradient-card {
+  background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+}
 
+/* ===== Glass Effect ===== */
 .glass {
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.card-hover { transition: all 0.3s ease; }
+/* ===== Cards ===== */
+.card-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  border-radius: 16px;
+}
 .card-hover:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(108, 92, 231, 0.2);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(108, 92, 231, 0.18);
 }
 
+/* ===== Typography ===== */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ===== Mobile Fix — 100dvh بدل 100vh ===== */
+.min-h-screen {
+  min-height: 100dvh !important;
+}
+.h-screen {
+  height: 100dvh !important;
+}
+
+/* ===== Navbar — منع التداخل ===== */
+nav.fixed {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  z-index: 50;
+}
+
+/* الصفحات اللي فيها navbar ثابت تاخد padding */
+main > section:first-of-type {
+  padding-top: 64px;
+}
+
+/* ===== Hero Section ===== */
+.hero-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 1rem;
+  min-height: 100dvh;
+}
+.hero-section > * {
+  max-width: 100%;
+}
+
+/* ===== Dashboard Cards — مسافات أحسن ===== */
+.dashboard-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+@media (min-width: 640px) {
+  .dashboard-grid { gap: 1.5rem; }
+}
+
+/* ===== Stats Cards ===== */
+.stat-card {
+  padding: 1.25rem;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 100px;
+}
+.stat-card p:first-of-type {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  line-height: 1.1;
+}
+.stat-card p:last-of-type {
+  font-size: clamp(0.7rem, 2vw, 0.875rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* ===== Buttons ===== */
+button, a {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+button:active, a:active {
+  transform: scale(0.97);
+}
+
+/* ===== Forms / Inputs ===== */
+input, select, textarea {
+  font-family: 'Tajawal', sans-serif;
+  direction: rtl;
+  width: 100%;
+}
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ===== Mobile Nav Tabs — منع الـ overflow ===== */
+.nav-tabs-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+.nav-tabs-scroll::-webkit-scrollbar { display: none; }
+
+/* ===== Sidebar ===== */
+@media (max-width: 768px) {
+  aside {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+  }
+}
+
+/* ===== Video Player ===== */
+video {
+  max-width: 100%;
+  border-radius: 12px;
+}
+.aspect-video {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+}
+.aspect-video iframe,
+.aspect-video video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+}
+
+/* ===== Responsive Text ===== */
+@media (max-width: 640px) {
+  h1 { font-size: clamp(1.75rem, 7vw, 3rem) !important; }
+  h2 { font-size: clamp(1.25rem, 5vw, 2rem) !important; }
+  
+  /* Dashboard header على موبايل */
+  .sticky.top-0 {
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Cards padding أصغر على موبايل */
+  .glass.rounded-2xl {
+    padding: 1rem;
+  }
+}
+
+/* ===== Toast Fix ===== */
+.go2072408551 {
+  font-family: 'Tajawal', sans-serif !important;
+  direction: rtl !important;
+}
+
+/* ===== Prevent layout shift ===== */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ===== Selection Color ===== */
+::selection {
+  background: rgba(108, 92, 231, 0.4);
+  color: #fff;
 }
