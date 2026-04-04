@@ -2,11 +2,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
+const STAGES = ['الصف الأول الإعدادي','الصف الثاني الإعدادي','الصف الثالث الإعدادي','الصف الأول الثانوي','الصف الثاني الثانوي','الصف الثالث الثانوي'];
+
 export default function CompleteProfilePage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', parent_phone: '', stage: '', school: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
+
+  const inp = "w-full py-3 px-4 rounded-xl text-sm focus:outline-none";
+  const inpStyle = { background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -17,86 +22,76 @@ export default function CompleteProfilePage() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!form.name || !form.phone || !form.stage) { setError('من فضلك اكمل الاسم والموبايل والمرحلة'); return; }
-    if (form.password && form.password !== form.confirmPassword) { setError('كلمتا المرور مش متطابقتين'); return; }
-    if (form.password && form.password.length < 6) { setError('كلمة المرور لازم 6 أحرف على الأقل'); return; }
-    setLoading(true);
-    setError('');
+    if (!form.name || !form.phone || !form.parent_phone || !form.stage || !form.school)
+      return setError('من فضلك اكمل كل البيانات المطلوبة');
+    if (form.password && form.password !== form.confirmPassword) return setError('كلمتا المرور مش متطابقتين');
+    if (form.password && form.password.length < 6) return setError('كلمة المرور لازم 6 أحرف على الأقل');
+    setLoading(true); setError('');
 
-    if (form.password) {
-      await supabase.auth.updateUser({ password: form.password });
-    }
+    if (form.password) await supabase.auth.updateUser({ password: form.password });
 
-    // لو الطالب موجود بالإيميل — نعمل update، لو لا — نعمل insert
-    const { data: existing } = await supabase
-      .from('students').select('id').eq('email', user.email).single();
-
+    const { data: existing } = await supabase.from('students').select('id').eq('email', user.email).single();
     let upsertError;
     if (existing) {
       const { error } = await supabase.from('students').update({
         user_id: user.id, name: form.name, phone: form.phone,
-        parent_phone: form.parent_phone, stage: form.stage,
-        school: form.school, profile_complete: true,
+        parent_phone: form.parent_phone, stage: form.stage, school: form.school, profile_complete: true,
       }).eq('email', user.email);
       upsertError = error;
     } else {
       const { error } = await supabase.from('students').insert({
         user_id: user.id, name: form.name, email: user.email,
         phone: form.phone, parent_phone: form.parent_phone,
-        stage: form.stage, school: form.school,
-        status: 'pending', profile_complete: true,
+        stage: form.stage, school: form.school, status: 'pending', profile_complete: true,
       });
       upsertError = error;
     }
-
     if (upsertError) { setError(upsertError.message); setLoading(false); return; }
-
     await supabase.auth.signOut();
     window.location.href = '/pending';
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center gradient-dark px-4" dir="rtl">
-      <div className="glass rounded-2xl p-8 w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8" style={{ background: 'var(--bg)' }} dir="rtl">
+      <div className="w-full max-w-md rounded-2xl p-6" style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
         <div className="text-center mb-6">
-          <div className="text-4xl mb-3">👋</div>
-          <h1 className="text-2xl font-black">اهلاً! كمّل بياناتك</h1>
-          <p className="text-gray-400 text-sm mt-1">{user?.email}</p>
+          <div className="text-4xl mb-2">👋</div>
+          <h1 className="text-2xl font-black" style={{ color: 'var(--text)' }}>اهلاً! كمّل بياناتك</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{user?.email}</p>
         </div>
 
-        {error && <div className="bg-red-500/20 text-red-400 p-3 rounded-xl mb-4 text-sm">{error}</div>}
+        {error && <div className="p-3 rounded-xl mb-4 text-sm text-center" style={{ background: 'rgba(248,113,113,0.1)', color: '#f87171' }}>{error}</div>}
 
         <div className="space-y-3">
-          <input type="text" placeholder="الاسم الكامل *" value={form.name}
-            onChange={e => setForm({ ...form, name: e.target.value })}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
-          <input type="tel" placeholder="رقم الموبايل *" value={form.phone}
-            onChange={e => setForm({ ...form, phone: e.target.value })}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
-          <input type="tel" placeholder="رقم ولي الأمر" value={form.parent_phone}
-            onChange={e => setForm({ ...form, parent_phone: e.target.value })}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
-          <input type="text" placeholder="المرحلة الدراسية *" value={form.stage}
-            onChange={e => setForm({ ...form, stage: e.target.value })}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
-          <input type="text" placeholder="المدرسة" value={form.school}
-            onChange={e => setForm({ ...form, school: e.target.value })}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
+          <input className={inp} style={inpStyle} type="text" placeholder="الاسم الكامل *"
+            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+          <input className={inp} style={inpStyle} type="tel" placeholder="رقم موبايلك *"
+            value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+          <input className={inp} style={inpStyle} type="tel" placeholder="رقم ولي الأمر *"
+            value={form.parent_phone} onChange={e => setForm({ ...form, parent_phone: e.target.value })} />
 
-          <div className="border-t border-white/10 pt-3">
-            <p className="text-gray-400 text-xs mb-2">اختياري — تحديد باسورد للدخول بالإيميل</p>
-            <input type="password" placeholder="باسورد (اختياري)" value={form.password}
-              onChange={e => setForm({ ...form, password: e.target.value })}
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none mb-2" />
+          <select className={inp} style={{ ...inpStyle, cursor: 'pointer' }}
+            value={form.stage} onChange={e => setForm({ ...form, stage: e.target.value })}>
+            <option value="">اختار الصف الدراسي *</option>
+            {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+
+          <input className={inp} style={inpStyle} type="text" placeholder="اسم المدرسة *"
+            value={form.school} onChange={e => setForm({ ...form, school: e.target.value })} />
+
+          <div className="pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>اختياري — باسورد للدخول بالإيميل</p>
+            <input className={inp} style={inpStyle} type="password" placeholder="باسورد (اختياري)"
+              value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
             {form.password && (
-              <input type="password" placeholder="تأكيد الباسورد" value={form.confirmPassword}
-                onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
+              <input className={`${inp} mt-2`} style={inpStyle} type="password" placeholder="تأكيد الباسورد"
+                value={form.confirmPassword} onChange={e => setForm({ ...form, confirmPassword: e.target.value })} />
             )}
           </div>
 
           <button onClick={handleSubmit} disabled={loading}
-            className="w-full gradient-primary py-3 rounded-xl text-white font-bold hover:opacity-90 disabled:opacity-50">
+            className="w-full py-3 rounded-xl text-white font-bold disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
             {loading ? '⏳ جاري الحفظ...' : 'إرسال طلب التسجيل 🚀'}
           </button>
         </div>
