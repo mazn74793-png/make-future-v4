@@ -45,6 +45,7 @@ export default function DashboardLayout({ children }) {
     { href: '/dashboard/whatsapp', label: '💬 واتساب' },
     { href: '/dashboard/announcements', label: '📢 الاعلانات' },
     { href: '/dashboard/testimonials', label: '⭐ آراء الطلاب' },
+    { href: '/dashboard/gallery', label: '🖼️ معرض الصور' },
     { href: '/dashboard/settings', label: '⚙️ الاعدادات' },
   ];
 
