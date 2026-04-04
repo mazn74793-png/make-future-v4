@@ -4,10 +4,54 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { FiMenu, FiX, FiBookOpen, FiLogIn, FiHome, FiMessageCircle } from 'react-icons/fi';
 
+function ThemeToggle() {
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = saved ? saved === 'dark' : prefersDark;
+    setIsDark(dark);
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.classList.toggle('light', !dark);
+  }, []);
+
+  const toggle = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    document.documentElement.classList.toggle('light', !next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+  };
+
+  return (
+    <button onClick={toggle}
+      className="relative w-12 h-6 rounded-full flex-shrink-0"
+      style={{
+        background: isDark ? 'rgba(99,102,241,0.25)' : 'rgba(245,158,11,0.15)',
+        border: `1px solid ${isDark ? 'rgba(99,102,241,0.4)' : 'rgba(245,158,11,0.4)'}`,
+        transition: 'all 0.3s ease',
+      }}
+      title={isDark ? 'الوضع النهاري' : 'الوضع الليلي'}
+    >
+      <div className="absolute top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-xs"
+        style={{
+          right: isDark ? '2px' : 'auto',
+          left: isDark ? 'auto' : '2px',
+          background: isDark ? '#6366f1' : '#f59e0b',
+          transition: 'all 0.3s ease',
+          boxShadow: isDark ? '0 0 8px rgba(99,102,241,0.5)' : '0 0 8px rgba(245,158,11,0.5)',
+        }}>
+        {isDark ? '🌙' : '☀️'}
+      </div>
+    </button>
+  );
+}
+
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [settings, setSettings] = useState(null);
-  const [userType, setUserType] = useState(null); // null | 'admin' | 'student'
+  const [userType, setUserType] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -38,78 +82,111 @@ export default function Navbar() {
     <nav className="fixed top-0 w-full z-50 glass">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2">
+
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
             {settings?.logo_url ? (
-              <img src={settings.logo_url} alt="Logo" className="w-10 h-10 rounded-xl" />
+              <img src={settings.logo_url} alt="Logo" className="w-9 h-9 rounded-xl object-cover" />
             ) : (
-              <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center">
-                <FiBookOpen className="text-white text-xl" />
+              <div className="w-9 h-9 gradient-primary rounded-xl flex items-center justify-center">
+                <FiBookOpen className="text-white text-lg" />
               </div>
             )}
-            <span className="text-xl font-bold bg-gradient-to-l from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <span className="text-base font-bold hidden sm:block"
+              style={{ background: 'linear-gradient(135deg, #818cf8, #f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               {settings?.site_name || 'منصة الأستاذ'}
             </span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-6">
-            <Link href="/" className="text-gray-300 hover:text-white transition flex items-center gap-1">
-              <FiHome /> الرئيسية
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle />
+            <Link href="/" className="text-sm hover:opacity-80 transition flex items-center gap-1"
+              style={{ color: 'var(--text-muted)' }}>
+              <FiHome className="text-base" /> الرئيسية
             </Link>
             {settings?.whatsapp_number && (
               <a href={`https://wa.me/${settings.whatsapp_number}`} target="_blank"
-                className="text-gray-300 hover:text-green-400 transition flex items-center gap-1">
-                <FiMessageCircle /> تواصل
+                className="text-sm transition flex items-center gap-1"
+                style={{ color: 'var(--text-muted)' }}>
+                <FiMessageCircle className="text-base" /> تواصل
               </a>
             )}
             {userType === 'admin' && (
-              <Link href="/dashboard" className="gradient-primary px-5 py-2 rounded-xl text-white font-medium hover:opacity-90 transition">
+              <Link href="/dashboard"
+                className="gradient-primary px-5 py-2 rounded-xl text-white text-sm font-bold hover:opacity-90 transition">
                 لوحة التحكم
               </Link>
             )}
             {userType === 'student' && (
               <>
-                <Link href="/student" className="gradient-primary px-5 py-2 rounded-xl text-white font-medium hover:opacity-90 transition">
+                <Link href="/student"
+                  className="gradient-primary px-5 py-2 rounded-xl text-white text-sm font-bold hover:opacity-90 transition">
                   كورساتي
                 </Link>
-                <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 transition text-sm">
+                <button onClick={handleLogout}
+                  className="text-sm transition px-3 py-2 rounded-xl"
+                  style={{ color: '#f87171' }}>
                   خروج
                 </button>
               </>
             )}
             {!userType && (
-              <Link href="/login" className="gradient-primary px-5 py-2 rounded-xl text-white font-medium hover:opacity-90 transition flex items-center gap-1">
+              <Link href="/login"
+                className="gradient-primary px-5 py-2 rounded-xl text-white text-sm font-bold hover:opacity-90 transition flex items-center gap-1">
                 <FiLogIn /> دخول
               </Link>
             )}
           </div>
 
-          <button onClick={() => setIsOpen(!isOpen)} className="md:hidden text-white text-2xl">
-            {isOpen ? <FiX /> : <FiMenu />}
-          </button>
+          {/* Mobile: theme + menu */}
+          <div className="flex items-center gap-3 md:hidden">
+            <ThemeToggle />
+            <button onClick={() => setIsOpen(!isOpen)}
+              className="text-xl p-1" style={{ color: 'var(--text)' }}>
+              {isOpen ? <FiX /> : <FiMenu />}
+            </button>
+          </div>
         </div>
 
+        {/* Mobile Menu */}
         {isOpen && (
-          <div className="md:hidden pb-4 animate-fade-in">
-            <div className="flex flex-col gap-3">
-              <Link href="/" onClick={() => setIsOpen(false)} className="text-gray-300 hover:text-white py-2">🏠 الرئيسية</Link>
+          <div className="md:hidden pb-4 pt-2 animate-fade-in border-t" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex flex-col gap-2">
+              <Link href="/" onClick={() => setIsOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl transition"
+                style={{ color: 'var(--text-muted)' }}>
+                🏠 الرئيسية
+              </Link>
               {settings?.whatsapp_number && (
-                <a href={`https://wa.me/${settings.whatsapp_number}`} target="_blank" className="text-gray-300 hover:text-white py-2">💬 تواصل</a>
+                <a href={`https://wa.me/${settings.whatsapp_number}`} target="_blank"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                  style={{ color: 'var(--text-muted)' }}>
+                  💬 تواصل
+                </a>
               )}
               {userType === 'admin' && (
-                <Link href="/dashboard" onClick={() => setIsOpen(false)} className="gradient-primary text-center px-6 py-2 rounded-xl text-white font-medium">
+                <Link href="/dashboard" onClick={() => setIsOpen(false)}
+                  className="gradient-primary text-center px-6 py-3 rounded-xl text-white font-bold">
                   🎛️ لوحة التحكم
                 </Link>
               )}
               {userType === 'student' && (
                 <>
-                  <Link href="/student" onClick={() => setIsOpen(false)} className="gradient-primary text-center px-6 py-2 rounded-xl text-white font-medium">
+                  <Link href="/student" onClick={() => setIsOpen(false)}
+                    className="gradient-primary text-center px-6 py-3 rounded-xl text-white font-bold">
                     📚 كورساتي
                   </Link>
-                  <button onClick={handleLogout} className="text-red-400 text-center py-2">🚪 خروج</button>
+                  <button onClick={handleLogout}
+                    className="text-center py-2 rounded-xl font-bold"
+                    style={{ color: '#f87171' }}>
+                    🚪 خروج
+                  </button>
                 </>
               )}
               {!userType && (
-                <Link href="/login" onClick={() => setIsOpen(false)} className="gradient-primary text-center px-6 py-2 rounded-xl text-white font-medium">
+                <Link href="/login" onClick={() => setIsOpen(false)}
+                  className="gradient-primary text-center px-6 py-3 rounded-xl text-white font-bold">
                   🔐 دخول
                 </Link>
               )}
