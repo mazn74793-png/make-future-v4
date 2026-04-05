@@ -59,6 +59,11 @@ export default async function HomePage() {
       )}
 
       {/* ===== Hero ===== */}
+      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden animated-bg"
+  style={{paddingTop:'80px', paddingBottom:'40px'}}>
+  <div className="p1"/><div className="p2"/><div className="p3"/><div className="p4"/>
+  <div className="p5"/><div className="p6"/><div className="p7"/><div className="p8"/>
+    
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden"
         style={{ paddingTop: '80px', paddingBottom: '40px' }}>
         {/* Animated particles */}
