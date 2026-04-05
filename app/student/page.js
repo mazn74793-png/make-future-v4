@@ -154,6 +154,16 @@ const toggleTheme = () => {
             <FiLogOut size={14} /> خروج
           </button>
         </div>
+              
+        <button onClick={toggleTheme}
+  className="flex items-center justify-center w-9 h-9 rounded-xl transition-all flex-shrink-0"
+  style={{
+    background: isDark ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.12)',
+    border: `1px solid ${isDark ? 'rgba(99,102,241,0.3)' : 'rgba(245,158,11,0.3)'}`,
+    color: isDark ? '#818cf8' : '#f59e0b',
+  }}>
+  {isDark ? <FiSun size={15}/> : <FiMoon size={15}/>}
+</button>
 
         {/* Tabs scrollable */}
         <div className="flex gap-1 px-4 pb-2 overflow-x-auto"
