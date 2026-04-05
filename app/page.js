@@ -1,7 +1,7 @@
 import Navbar from '@/components/Navbar';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { FiPlay, FiArrowLeft, FiVideo, FiBookOpen, FiStar, FiAward } from 'react-icons/fi';
+import { FiPlay, FiArrowLeft, FiBookOpen, FiStar, FiAward, FiMessageCircle } from 'react-icons/fi';
 
 export const revalidate = 60;
 
@@ -31,291 +31,216 @@ export default async function HomePage() {
     supabase.from('gallery').select('id,url,caption').eq('is_visible', true).order('order_num').limit(12),
   ]);
 
+  // حالة الصيانة
   if (settings?.is_maintenance) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
-      <div className="text-center p-8">
-        <div className="text-6xl mb-4">🔧</div>
-        <h1 className="text-2xl font-black" style={{ color: 'var(--text)' }}>{settings.maintenance_message}</h1>
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+      <div className="glass-card p-10 text-center max-w-md mx-4">
+        <div className="text-6xl mb-6 animate-float">🔧</div>
+        <h1 className="text-2xl font-black mb-2">{settings.maintenance_message}</h1>
+        <p className="text-[var(--text-muted)] text-sm">نعمل حالياً على تحسين المنصة، سنعود قريباً!</p>
       </div>
     </div>
   );
 
   return (
-    <main style={{ background: 'var(--bg)', color: 'var(--text)', minHeight: '100dvh' }}>
+    <div className="relative">
+      <Navbar />
 
-      {/* Aurora Background */}
-      <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-        <div className="aurora-orb aurora-orb-1" />
-        <div className="aurora-orb aurora-orb-2" />
-        <div className="aurora-orb aurora-orb-3" />
-        <div className="aurora-orb aurora-orb-4" />
-      </div>
+      {/* Announcements - تحسين العرض ليكون أنحف وأوضح */}
+      {announcements?.length > 0 && (
+        <div className="fixed top-16 w-full z-40 space-y-1">
+          {announcements.map(ann => (
+            <div key={ann.id} className={`px-4 py-2 text-center text-[11px] md:text-sm font-bold shadow-lg backdrop-blur-md ${
+              ann.type === 'urgent' ? 'bg-red-500/90 text-white' :
+              ann.type === 'warning' ? 'bg-amber-500/90 text-black' :
+              ann.type === 'success' ? 'bg-emerald-600/90 text-white' : 'bg-indigo-600/90 text-white'}`}>
+              📢 {ann.title}: {ann.content}
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <Navbar />
-
-        {/* Announcements */}
-        {announcements?.length > 0 && (
-          <div className="fixed top-16 w-full z-40">
-            {announcements.map(ann => (
-              <div key={ann.id} className={`px-4 py-2 text-center text-sm font-bold ${
-                ann.type === 'urgent' ? 'bg-red-500' :
-                ann.type === 'warning' ? 'bg-yellow-500 text-black' :
-                ann.type === 'success' ? 'bg-green-600' : 'bg-indigo-600'}`}>
-                📢 {ann.title}: {ann.content}
+      {/* ===== Hero Section ===== */}
+      <section className="relative pt-32 pb-20 px-4 text-center overflow-hidden">
+        <div className="max-w-5xl mx-auto">
+          
+          {/* صورة المدرس بتأثير Glow */}
+          {settings?.teacher_image_url && (
+            <div className="relative inline-block mb-10 animate-fade-in">
+              <div className="w-32 h-32 md:w-48 md:h-48 rounded-3xl overflow-hidden mx-auto rotate-3 group hover:rotate-0 transition-transform duration-500 shadow-2xl border-4 border-white/5">
+                <img src={settings.teacher_image_url} className="w-full h-full object-cover scale-110 group-hover:scale-100 transition-transform duration-500" alt={settings.teacher_name} />
               </div>
-            ))}
+              <div className="absolute -bottom-4 -right-4 glass-card px-4 py-2 flex items-center gap-2 animate-float">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest">متواجد الآن</span>
+              </div>
+            </div>
+          )}
+
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full mb-8 glass border-indigo-500/20 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <FiAward className="text-indigo-400" />
+            <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide">
+              {settings?.teacher_name} {settings?.subject ? `| ${settings.subject}` : ''}
+            </span>
           </div>
-        )}
 
-        {/* ===== Hero ===== */}
-        <section className="relative pt-28 pb-20 px-4 text-center overflow-hidden">
-          <div className="max-w-4xl mx-auto">
+          <h1 className="font-black mb-8 leading-[1.1] animate-fade-in"
+            style={{ fontSize: 'clamp(2.5rem, 8vw, 5.5rem)', animationDelay: '0.2s' }}>
+            {settings?.hero_title || 'مستقبلك يبدأ من'}
+            <span className="block gradient-primary bg-clip-text text-transparent animate-glow">
+              {settings?.subject || 'هنا'}
+            </span>
+          </h1>
 
-            {settings?.teacher_image_url && (
-              <div className="relative inline-block mb-8 animate-fade-in">
-                <div className="w-32 h-32 md:w-44 md:h-44 rounded-full overflow-hidden mx-auto"
-                  style={{
-                    border: '3px solid rgba(99,102,241,0.5)',
-                    boxShadow: '0 0 60px rgba(99,102,241,0.3), 0 0 0 8px rgba(99,102,241,0.08)',
-                  }}>
-                  <img src={settings.teacher_image_url} className="w-full h-full object-cover" alt={settings.teacher_name} />
-                </div>
-                <span style={{
-                  position: 'absolute', bottom: '10px', right: '16px',
-                  width: '16px', height: '16px', borderRadius: '50%',
-                  background: '#34d399', border: '2px solid var(--bg)',
-                  boxShadow: '0 0 10px rgba(52,211,153,0.7)', display: 'block',
-                }} />
-              </div>
+          <p className="text-sm md:text-lg mb-12 max-w-2xl mx-auto leading-relaxed text-[var(--text-muted)] animate-fade-in" style={{ animationDelay: '0.3s' }}>
+            {settings?.hero_subtitle || settings?.site_description}
+          </p>
+
+          <div className="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+            <Link href="/login" className="px-10 py-4 rounded-2xl text-white font-bold flex items-center justify-center gap-3 transition-all hover:scale-105 gradient-primary shadow-xl shadow-indigo-500/20">
+              <FiPlay fill="currentColor" /> ابدأ رحلتك الآن
+            </Link>
+            {settings?.whatsapp_number && (
+              <a href={`https://wa.me/${settings.whatsapp_number}`} target="_blank"
+                className="px-10 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all hover:bg-white/5 glass text-[var(--text)]">
+                تواصل مع الدعم <FiMessageCircle size={18} />
+              </a>
             )}
-
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full mb-6 animate-fade-in"
-              style={{
-                background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
-                animationDelay: '0.1s',
-              }}>
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-sm font-bold" style={{ color: 'var(--text-muted)' }}>
-                {settings?.teacher_name}
-                {settings?.subject ? ` • ${settings.subject}` : ''}
-                {settings?.stage ? ` • ${settings.stage}` : ''}
-              </span>
-            </div>
-
-            <h1 className="font-black mb-6 leading-tight animate-fade-in"
-              style={{ fontSize: 'clamp(2.2rem, 9vw, 5.5rem)', animationDelay: '0.2s', color: 'var(--text)' }}>
-              {settings?.hero_title || 'مستقبلك يبدأ من'}
-              <span className="block" style={{
-                background: 'linear-gradient(135deg, #818cf8 0%, #f472b6 50%, #818cf8 100%)',
-                backgroundSize: '200% auto',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text', animation: 'morphGrad 4s ease infinite',
-              }}>
-                {settings?.subject || 'هنا'}
-              </span>
-            </h1>
-
-            <p className="text-base md:text-xl mb-10 max-w-2xl mx-auto leading-relaxed animate-fade-in"
-              style={{ color: 'var(--text-muted)', animationDelay: '0.3s' }}>
-              {settings?.hero_subtitle || settings?.site_description || 'منصة تعليمية متكاملة'}
-            </p>
-
-            <div className="flex flex-col sm:flex-row justify-center gap-4 animate-fade-in" style={{ animationDelay: '0.4s' }}>
-              <Link href="/login"
-                className="px-10 py-4 rounded-2xl text-white font-bold flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
-                style={{
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  boxShadow: '0 8px 30px rgba(99,102,241,0.35)',
-                }}>
-                <FiPlay size={18} /> ابدأ رحلتك الآن
-              </Link>
-              {settings?.whatsapp_number && (
-                <a href={`https://wa.me/${settings.whatsapp_number}`} target="_blank"
-                  className="px-10 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
-                  style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                  تواصل مع الدعم <FiArrowLeft size={16} />
-                </a>
-              )}
-            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ===== Stats ===== */}
-        <section className="py-10 px-4">
-          <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'طالب مشترك', val: `+${statsData?.students || 0}`, icon: '👥', color: '#818cf8' },
-              { label: 'كورس متاح', val: `+${statsData?.courses || 0}`, icon: '📚', color: '#f472b6' },
-              { label: 'فيديو تعليمي', val: `+${statsData?.videos || 0}`, icon: '🎬', color: '#34d399' },
-              { label: 'سنة خبرة', val: settings?.stats_rating || '4.9⭐', icon: '🏆', color: '#fbbf24' },
-            ].map((s, i) => (
-              <div key={i} className="text-center py-5 px-3 rounded-2xl animate-fade-in card-hover"
-                style={{ background: 'var(--bg2)', border: '1px solid var(--border)', animationDelay: `${i * 0.1}s` }}>
-                <div className="text-2xl mb-2">{s.icon}</div>
-                <div className="text-2xl md:text-3xl font-black mb-1"
-                  style={{
-                    background: `linear-gradient(135deg, ${s.color}, #818cf8)`,
-                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-                  }}>{s.val}</div>
-                <div className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </section>
+      {/* ===== Stats ===== */}
+      <section className="py-12 px-4 relative z-10">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          {[
+            { label: 'طالب مشترك', val: `${statsData?.students || 0}+`, icon: '👥', color: 'var(--primary)' },
+            { label: 'كورس متاح', val: `${statsData?.courses || 0}+`, icon: '📚', color: 'var(--accent)' },
+            { label: 'فيديو تعليمي', val: `${statsData?.videos || 0}+`, icon: '🎬', color: 'var(--accent2)' },
+            { label: 'سنة خبرة', val: settings?.stats_rating || '4.9⭐', icon: '🏆', color: '#fbbf24' },
+          ].map((s, i) => (
+            <div key={i} className="glass-card p-6 text-center animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
+              <div className="text-2xl mb-3">{s.icon}</div>
+              <div className="text-2xl md:text-3xl font-black mb-1" style={{ color: s.color }}>{s.val}</div>
+              <div className="text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-tighter">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-        {/* ===== Courses ===== */}
-        {courses?.length > 0 && (
-          <section className="py-20 px-4">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-between mb-10">
-                <h2 className="font-black" style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)', color: 'var(--text)' }}>
-                  أحدث{' '}
-                  <span style={{
-                    background: 'linear-gradient(135deg, #818cf8, #f472b6)',
-                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-                  }}>الكورسات</span>
-                </h2>
-                <Link href="/login" className="text-sm font-bold" style={{ color: '#818cf8' }}>عرض الكل ←</Link>
+      {/* ===== Courses ===== */}
+      {courses?.length > 0 && (
+        <section className="py-24 px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-end justify-between mb-12">
+              <div>
+                <h2 className="text-3xl md:text-5xl font-black mb-2">أحدث الكورسات</h2>
+                <div className="h-1.5 w-20 gradient-primary rounded-full" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {courses.map((course, i) => (
-                  <Link href="/login" key={course.id}>
-                    <div className="rounded-2xl overflow-hidden card-hover animate-fade-in"
-                      style={{ background: 'var(--bg2)', border: '1px solid var(--border)', animationDelay: `${i * 0.08}s` }}>
-                      <div className="relative h-44 overflow-hidden">
-                        {course.thumbnail_url
-                          ? <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" />
-                          : <div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-                              <FiBookOpen className="text-white/40" style={{ fontSize: '3rem' }} />
-                            </div>}
-                        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)' }} />
-                        {course.is_free && (
-                          <span className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-black text-white" style={{ background: '#10b981' }}>مجاني</span>
-                        )}
-                        {course.stage && (
-                          <span className="absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-bold text-white" style={{ background: 'rgba(99,102,241,0.85)' }}>{course.stage}</span>
-                        )}
-                      </div>
-                      <div className="p-5">
-                        <h3 className="font-black mb-1 line-clamp-1" style={{ color: 'var(--text)' }}>{course.title}</h3>
-                        <p className="text-sm line-clamp-2 mb-3" style={{ color: 'var(--text-muted)' }}>{course.description}</p>
-                        <div className="flex items-center justify-between">
-                          <span className="font-black" style={{ color: '#818cf8' }}>{course.is_free ? 'مجاني' : `${course.price || 0} ج.م`}</span>
-                          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>
-                            <FiArrowLeft size={15} />
-                          </div>
-                        </div>
+              <Link href="/login" className="text-xs font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300">عرض الكل ←</Link>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.map((course, i) => (
+                <Link href="/login" key={course.id} className="glass-card group overflow-hidden animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
+                  <div className="relative aspect-video overflow-hidden">
+                    <img src={course.thumbnail_url || '/placeholder.png'} alt={course.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
+                    {course.is_free && <span className="absolute top-4 right-4 px-3 py-1 rounded-lg text-[10px] font-black bg-emerald-500 text-white shadow-lg">مجاني</span>}
+                    {course.stage && <span className="absolute bottom-4 right-4 px-3 py-1 rounded-lg text-[10px] font-black bg-indigo-500/80 backdrop-blur-md text-white">{course.stage}</span>}
+                  </div>
+                  <div className="p-6">
+                    <h3 className="font-black text-lg mb-2 line-clamp-1 group-hover:text-indigo-400 transition-colors">{course.title}</h3>
+                    <p className="text-[var(--text-muted)] text-sm line-clamp-2 mb-6 leading-relaxed">{course.description}</p>
+                    <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                      <span className="text-xl font-black text-indigo-400">{course.is_free ? '0' : course.price}<span className="text-[10px] mr-1 text-[var(--text-faint)] font-bold">ج.م</span></span>
+                      <div className="flex items-center gap-2 text-xs font-bold text-indigo-400">
+                        استكشف <FiArrowLeft />
                       </div>
                     </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ===== Gallery ===== */}
-        {gallery?.length > 0 && (
-          <section className="py-20 px-4">
-            <div className="max-w-7xl mx-auto">
-              <h2 className="font-black text-center mb-12" style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)', color: 'var(--text)' }}>
-                لحظات من{' '}
-                <span style={{
-                  background: 'linear-gradient(135deg, #818cf8, #f472b6)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-                }}>نجاحنا</span>
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {gallery.map((img, i) => (
-                  <div key={img.id} className="relative rounded-2xl overflow-hidden card-hover group animate-fade-in"
-                    style={{ aspectRatio: '1', animationDelay: `${i * 0.05}s` }}>
-                    <img src={img.url} alt={img.caption || ''} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                    {img.caption && (
-                      <div className="absolute inset-0 flex items-end p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75), transparent)' }}>
-                        <p className="text-white text-xs font-bold">{img.caption}</p>
-                      </div>
-                    )}
                   </div>
-                ))}
-              </div>
+                </Link>
+              ))}
             </div>
-          </section>
-        )}
+          </div>
+        </section>
+      )}
 
-        {/* ===== About ===== */}
-        {settings?.about_text && (
-          <section className="py-20 px-4">
-            <div className="max-w-4xl mx-auto p-8 md:p-10 rounded-3xl"
-              style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-              <div className="flex flex-col md:flex-row items-center gap-8">
-                {settings.teacher_image_url && (
-                  <img src={settings.teacher_image_url} alt={settings.teacher_name}
-                    className="w-28 h-28 rounded-2xl object-cover flex-shrink-0"
-                    style={{ border: '3px solid rgba(99,102,241,0.4)' }} />
-                )}
-                <div>
-                  <h2 className="text-2xl font-black mb-1" style={{ color: 'var(--text)' }}>{settings.teacher_name}</h2>
-                  <p className="mb-3 text-sm font-bold" style={{ color: '#818cf8' }}>{settings.subject} • {settings.stage}</p>
-                  <p className="leading-relaxed text-sm" style={{ color: 'var(--text-muted)' }}>{settings.about_text}</p>
+      {/* ===== Gallery (Grid Modern) ===== */}
+      {gallery?.length > 0 && (
+        <section className="py-24 px-4 bg-[var(--surface)]">
+          <div className="max-w-7xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-black text-center mb-16">لحظات <span className="gradient-primary bg-clip-text text-transparent">النجاح</span></h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {gallery.map((img, i) => (
+                <div key={img.id} className="glass-card aspect-square overflow-hidden group animate-fade-in" style={{ animationDelay: `${i * 0.05}s` }}>
+                  <img src={img.url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ===== Testimonials ===== */}
-        {testimonials?.length > 0 && (
-          <section className="py-20 px-4">
-            <div className="max-w-6xl mx-auto">
-              <h2 className="font-black text-center mb-12" style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)', color: 'var(--text)' }}>
-                أبطالنا{' '}
-                <span style={{
-                  background: 'linear-gradient(135deg, #818cf8, #f472b6)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-                }}>بيقولوا إيه؟</span>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {testimonials.map((t, i) => (
-                  <div key={t.id} className="p-6 rounded-2xl card-hover animate-fade-in relative overflow-hidden"
-                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', animationDelay: `${i * 0.1}s` }}>
-                    <FiStar className="absolute top-6 left-6 opacity-10" size={48} style={{ color: '#818cf8' }} />
-                    <div className="flex gap-0.5 mb-4">
-                      {Array(t.rating).fill(null).map((_, j) => (
-                        <FiStar key={j} fill="#fbbf24" stroke="none" size={14} className="text-yellow-400" />
-                      ))}
-                    </div>
-                    <p className="text-sm leading-relaxed mb-6 italic" style={{ color: 'var(--text-muted)' }}>"{t.comment}"</p>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center font-black text-white flex-shrink-0"
-                        style={{ background: 'linear-gradient(135deg, #6366f1, #f472b6)' }}>
-                        {t.student_name[0]}
-                      </div>
-                      <span className="font-bold text-sm" style={{ color: 'var(--text)' }}>{t.student_name}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ===== Footer ===== */}
-        <footer className="py-10 px-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
-          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              {settings?.footer_text || '© 2026 جميع الحقوق محفوظة'}
-            </p>
-            <div className="flex gap-5">
-              {settings?.facebook_url && <a href={settings.facebook_url} target="_blank" className="text-sm transition hover:opacity-80" style={{ color: 'var(--text-muted)' }}>Facebook</a>}
-              {settings?.youtube_url && <a href={settings.youtube_url} target="_blank" className="text-sm transition hover:opacity-80" style={{ color: 'var(--text-muted)' }}>YouTube</a>}
-              {settings?.telegram_url && <a href={settings.telegram_url} target="_blank" className="text-sm transition hover:opacity-80" style={{ color: 'var(--text-muted)' }}>Telegram</a>}
+              ))}
             </div>
           </div>
-        </footer>
-      </div>
-    </main>
+        </section>
+      )}
+
+      {/* ===== About ===== */}
+      {settings?.about_text && (
+        <section className="py-24 px-4">
+          <div className="max-w-4xl mx-auto glass-card p-8 md:p-16 relative overflow-hidden">
+            <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+              <div className="w-32 h-32 md:w-44 md:h-44 rounded-full border-4 border-indigo-500/20 flex-shrink-0 overflow-hidden shadow-2xl">
+                <img src={settings.teacher_image_url} alt="" className="w-full h-full object-cover" />
+              </div>
+              <div className="text-center md:text-right">
+                <h2 className="text-3xl font-black mb-2">{settings.teacher_name}</h2>
+                <p className="text-indigo-400 font-bold mb-6">{settings.subject} • {settings.stage}</p>
+                <p className="text-[var(--text-muted)] leading-loose italic">"{settings.about_text}"</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ===== Testimonials ===== */}
+      {testimonials?.length > 0 && (
+        <section className="py-24 px-4">
+          <div className="max-w-7xl mx-auto">
+            <h2 className="text-3xl md:text-5xl font-black text-center mb-16">ماذا يقول <span className="text-indigo-400">طلابنا؟</span></h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {testimonials.map((t, i) => (
+                <div key={t.id} className="glass-card p-8 animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
+                  <div className="flex gap-1 mb-6">
+                    {Array(t.rating).fill(0).map((_, j) => <FiStar key={j} fill="#fbbf24" stroke="none" size={16} />)}
+                  </div>
+                  <p className="text-[var(--text-muted)] leading-relaxed mb-8 italic">"{t.comment}"</p>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center font-black text-white">{t.student_name[0]}</div>
+                    <span className="font-bold text-sm">{t.student_name}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ===== Footer ===== */}
+      <footer className="py-12 px-4 border-t border-white/5 bg-[var(--bg2)]">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="text-center md:text-right">
+            <h3 className="font-black text-lg mb-2">{settings?.site_name}</h3>
+            <p className="text-[var(--text-faint)] text-xs">{settings?.footer_text || '© 2026 جميع الحقوق محفوظة'}</p>
+          </div>
+          <div className="flex gap-6">
+            {['Facebook', 'YouTube', 'Telegram'].map(platform => {
+              const url = settings?.[`${platform.toLowerCase()}_url`];
+              return url && (
+                <a key={platform} href={url} target="_blank" className="text-xs font-bold text-[var(--text-muted)] hover:text-indigo-400 transition-colors uppercase tracking-widest">{platform}</a>
+              );
+            })}
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }
