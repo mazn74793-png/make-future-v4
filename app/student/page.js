@@ -10,195 +10,162 @@ import {
 export default function StudentPage() {
   const [student, setStudent] = useState(null);
   const [courses, setCourses] = useState([]);
-  const [exams, setExams] = useState([]); // ضفنا جلب الامتحانات
+  const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDark, setIsDark] = useState(true);
+  const [activeTab, setActiveTab] = useState('home'); // لإدارة التبديل بين الأقسام
   const router = useRouter();
 
-  // 1. نظام الثيم المحسن
+  // 1. إصلاح زرار اللايت مود (تعديل مباشر على الـ DOM)
   useEffect(() => {
     const saved = localStorage.getItem('theme') || 'dark';
-    setIsDark(saved === 'dark');
-    document.documentElement.classList.toggle('dark', saved === 'dark');
+    applyTheme(saved === 'dark');
   }, []);
 
-  const toggleTheme = () => {
-    const next = !isDark;
-    setIsDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('theme', next ? 'dark' : 'light');
+  const applyTheme = (dark) => {
+    setIsDark(dark);
+    if (dark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.style.backgroundColor = '#09090b';
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.backgroundColor = '#ffffff';
+    }
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
   };
 
-  // 2. جلب البيانات (تعديل الفلترة)
+  // 2. جلب البيانات
   useEffect(() => {
     const loadData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
+        if (!user) return router.push('/login');
 
-        // جلب بيانات الطالب بدقة
-        const { data: stData } = await supabase
-          .from('students')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (!stData || stData.status !== 'approved') { 
-          router.push('/pending'); 
-          return; 
-        }
+        const { data: stData } = await supabase.from('students').select('*').eq('user_id', user.id).single();
+        if (!stData || stData.status !== 'approved') return router.push('/pending');
         setStudent(stData);
 
-        // جلب الكورسات الخاصة بمرحلة الطالب فقط + الكورسات العامة
-        const { data: cData } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('is_published', true)
-          .or(`stage.eq.${stData.stage},visibility.eq.public`);
-
+        const { data: cData } = await supabase.from('courses').select('*').eq('is_published', true);
         setCourses(cData || []);
 
-        // جلب الامتحانات المتاحة
-        const { data: eData } = await supabase
-          .from('exams')
-          .select('*')
-          .eq('is_active', true)
-          .eq('stage', stData.stage);
-        
+        const { data: eData } = await supabase.from('exams').select('*').eq('is_active', true).eq('stage', stData.stage);
         setExams(eData || []);
-
-      } catch (error) {
-        console.error("Dashboard Error:", error);
       } finally {
         setLoading(false);
       }
     };
     loadData();
-  }, [router]);
+  }, []);
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#09090b]">
-      <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
-  );
+  if (loading) return <div className="h-screen flex items-center justify-center dark:bg-[#09090b] bg-white">
+    <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#09090b] text-slate-900 dark:text-white transition-colors duration-300" dir="rtl">
+    <div className="min-h-screen transition-colors duration-300 dark:bg-[#09090b] bg-gray-50 dark:text-white text-gray-900" dir="rtl">
       
-      {/* Navbar عصري */}
-      <nav className="h-20 border-b border-slate-200 dark:border-white/5 px-6 flex items-center justify-between sticky top-0 bg-white/80 dark:bg-[#09090b]/80 backdrop-blur-md z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
+      {/* Navbar العلوي */}
+      <nav className="h-16 border-b dark:border-white/5 border-gray-200 px-6 flex items-center justify-between sticky top-0 bg-white/80 dark:bg-[#09090b]/80 backdrop-blur-md z-50">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white font-bold text-xs">
             {student?.name?.charAt(0)}
           </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-widest text-indigo-500 font-bold">طالب منصة التفوق</p>
-            <span className="font-bold text-sm">{student?.name}</span>
-          </div>
+          <span className="font-bold text-sm hidden sm:block">{student?.name}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={toggleTheme} className="p-3 rounded-xl bg-slate-100 dark:bg-white/5 hover:scale-110 transition-all">
+        
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => applyTheme(!isDark)} 
+            className="p-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
+          >
             {isDark ? <FiSun className="text-yellow-500" /> : <FiMoon className="text-indigo-600" />}
           </button>
-          <button onClick={() => supabase.auth.signOut()} className="p-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all">
-            <FiLogOut />
-          </button>
+          <button onClick={() => supabase.auth.signOut()} className="text-red-500 p-2"><FiLogOut /></button>
         </div>
       </nav>
 
-      <main className="p-6 max-w-7xl mx-auto pb-24">
+      <main className="p-4 md:p-8 max-w-6xl mx-auto pb-24">
         
-        {/* هيرو سكشن (ترحيب) */}
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-indigo-600 p-8 md:p-12 mb-12 text-white">
-          <div className="relative z-10">
-            <h1 className="text-3xl md:text-4xl font-black mb-4">أهلاً بك يا {student?.name?.split(' ')[0]}! 🚀</h1>
-            <p className="text-indigo-100 max-w-md leading-relaxed opacity-90">
-              أنت الآن في مرحلة <span className="font-bold underline">{student?.stage}</span>. 
-              لديك {courses.length} كورس متاح و {exams.length} امتحان بانتظارك.
-            </p>
-          </div>
-          <FiBookOpen className="absolute -bottom-10 -left-10 text-white/10 size-64 rotate-12" />
-        </div>
+        {/* التبديل بين المحتوى بناءً على التاب النشط */}
+        {activeTab === 'home' && (
+          <div className="animate-in fade-in duration-500">
+             <div className="mb-8">
+                <h1 className="text-2xl font-black">أهلاً، {student?.name?.split(' ')[0]} 👋</h1>
+                <p className="text-sm opacity-50">مرحلتك: {student?.stage}</p>
+             </div>
 
-        <div className="grid lg:grid-cols-3 gap-10">
-          
-          {/* قسم الكورسات (2/3 المساحة) */}
-          <div className="lg:col-span-2 space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold flex items-center gap-3">
-                <div className="w-2 h-8 bg-indigo-500 rounded-full" />
-                الكورسات المتاحة
-              </h2>
-            </div>
-            
-            {courses.length === 0 ? (
-              <div className="p-20 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[2.5rem] text-center opacity-40">
-                لا توجد دروس متاحة حالياً لمرحلتك.
-              </div>
-            ) : (
-              <div className="grid sm:grid-cols-2 gap-6">
+             <h2 className="font-bold mb-4 flex items-center gap-2"><FiBookOpen className="text-indigo-500"/> الكورسات</h2>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {courses.map(course => (
-                  <div key={course.id} className="group bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-[2rem] overflow-hidden hover:border-indigo-500/50 transition-all shadow-sm">
-                    <div className="aspect-video relative overflow-hidden">
-                      {course.thumbnail ? (
-                        <img src={course.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                      ) : (
-                        <div className="w-full h-full bg-slate-200 dark:bg-white/10 flex items-center justify-center text-slate-400">
-                          <FiPlay size={48} />
-                        </div>
-                      )}
-                      <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white text-[10px] px-3 py-1 rounded-full font-bold">
-                        {course.visibility === 'public' ? 'مجاني' : 'مشترك'}
-                      </div>
+                  <div key={course.id} className="dark:bg-white/5 bg-white border dark:border-white/5 border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="aspect-video bg-gray-200 dark:bg-gray-800">
+                      {course.thumbnail && <img src={course.thumbnail} className="w-full h-full object-cover" />}
                     </div>
-                    <div className="p-6">
-                      <h3 className="font-bold text-lg mb-4 line-clamp-1">{course.title}</h3>
+                    <div className="p-4">
+                      <h3 className="font-bold text-sm mb-3">{course.title}</h3>
                       <button 
                         onClick={() => router.push(`/student/course/${course.id}`)}
-                        className="w-full py-4 bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 rounded-2xl font-bold group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all flex items-center justify-center gap-2"
-                      >
-                        ابدأ التعلم الآن <FiChevronLeft />
-                      </button>
+                        className="w-full py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold"
+                      >دخول الدرس</button>
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
+             </div>
           </div>
+        )}
 
-          {/* قسم الجانب (الامتحانات) */}
-          <div className="space-y-8">
-            <h2 className="text-xl font-bold flex items-center gap-3">
-              <div className="w-2 h-8 bg-emerald-500 rounded-full" />
-              الامتحانات
-            </h2>
-            <div className="space-y-4">
-              {exams.length > 0 ? exams.map(exam => (
-                <div key={exam.id} className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-3xl flex items-center justify-between group hover:bg-emerald-500 transition-all cursor-pointer" onClick={() => router.push(`/student/exam/${exam.id}`)}>
-                  <div>
-                    <h4 className="font-bold group-hover:text-white transition-colors">{exam.title}</h4>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-100 transition-colors mt-1">{exam.duration_minutes} دقيقة</p>
+        {activeTab === 'exams' && (
+          <div className="animate-in slide-in-from-bottom-4 duration-500">
+             <h2 className="font-bold mb-6 text-xl">الامتحانات المتاحة</h2>
+             <div className="space-y-3">
+                {exams.map(exam => (
+                  <div key={exam.id} onClick={() => router.push(`/student/exam/${exam.id}`)} className="p-4 dark:bg-white/5 bg-white border dark:border-white/5 border-gray-200 rounded-2xl flex justify-between items-center cursor-pointer hover:border-indigo-500">
+                    <span className="font-bold">{exam.title}</span>
+                    <FiChevronLeft className="text-indigo-500" />
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center group-hover:bg-white group-hover:text-emerald-500 transition-all">
-                    <FiCheckCircle />
-                  </div>
-                </div>
-              )) : (
-                <div className="p-6 bg-slate-50 dark:bg-white/5 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 text-center text-sm opacity-50">
-                  لا توجد امتحانات نشطة حالياً.
-                </div>
-              )}
-            </div>
+                ))}
+                {exams.length === 0 && <p className="text-center opacity-50 py-10">لا توجد امتحانات حالياً</p>}
+             </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'profile' && (
+           <div className="text-center py-10 animate-in fade-in">
+              <div className="w-20 h-20 bg-indigo-500 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl font-bold text-white">
+                {student?.name?.charAt(0)}
+              </div>
+              <h2 className="text-xl font-bold">{student?.name}</h2>
+              <p className="opacity-50 text-sm mt-1">{student?.phone}</p>
+              <div className="mt-6 p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 max-w-xs mx-auto">
+                <p className="text-xs font-bold text-indigo-500 uppercase">حالة الحساب</p>
+                <p className="font-bold mt-1">نشط ومفعل</p>
+              </div>
+           </div>
+        )}
       </main>
 
-      {/* شريط الموبايل السفلي */}
-      <div className="fixed bottom-6 inset-x-6 h-16 bg-white/80 dark:bg-white/10 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl flex justify-around items-center lg:hidden z-50 shadow-2xl">
-        <button onClick={() => router.push('/student')} className="text-indigo-500"><FiHome size={24}/></button>
-        <button onClick={() => router.push('/student/courses')} className="opacity-40"><FiBookOpen size={24}/></button>
-        <button className="opacity-40"><FiShoppingBag size={24}/></button>
-        <button className="opacity-40"><FiUser size={24}/></button>
+      {/* بار الموبايل السفلي (شغال فعلياً) */}
+      <div className="fixed bottom-0 inset-x-0 h-16 dark:bg-[#09090b]/90 bg-white/90 backdrop-blur-md border-t dark:border-white/5 border-gray-200 flex justify-around items-center z-50">
+        <button 
+          onClick={() => setActiveTab('home')} 
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'home' ? 'text-indigo-500 scale-110' : 'opacity-40'}`}
+        >
+          <FiHome size={20} /><span className="text-[10px] font-bold">الرئيسية</span>
+        </button>
+        
+        <button 
+          onClick={() => setActiveTab('exams')} 
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'exams' ? 'text-indigo-500 scale-110' : 'opacity-40'}`}
+        >
+          <FiCheckCircle size={20} /><span className="text-[10px] font-bold">الامتحانات</span>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('profile')} 
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'profile' ? 'text-indigo-500 scale-110' : 'opacity-40'}`}
+        >
+          <FiUser size={20} /><span className="text-[10px] font-bold">حسابي</span>
+        </button>
       </div>
     </div>
   );
