@@ -58,25 +58,15 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* ===== Hero ===== */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden animated-bg"
-  style={{paddingTop:'80px', paddingBottom:'40px'}}>
-  <div className="p1"/><div className="p2"/><div className="p3"/><div className="p4"/>
-  <div className="p5"/><div className="p6"/><div className="p7"/><div className="p8"/>
-    
+      {/* Hero */}
       <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden"
         style={{ paddingTop: '80px', paddingBottom: '40px' }}>
-        {/* Animated particles */}
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
           {[...Array(6)].map((_, i) => (
             <div key={i} className="animate-float" style={{
-              position: 'absolute',
-              borderRadius: '50%',
-              filter: 'blur(80px)',
-              opacity: 0.12,
+              position: 'absolute', borderRadius: '50%', filter: 'blur(80px)', opacity: 0.12,
               background: i % 2 === 0 ? '#6366f1' : '#f472b6',
-              width: `${150 + i * 60}px`,
-              height: `${150 + i * 60}px`,
+              width: `${150 + i * 60}px`, height: `${150 + i * 60}px`,
               top: `${10 + i * 12}%`,
               left: i % 2 === 0 ? `${-5 + i * 15}%` : 'auto',
               right: i % 2 !== 0 ? `${-5 + i * 10}%` : 'auto',
@@ -154,7 +144,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ===== Features ===== */}
+      {/* Features */}
       <section className="py-20 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="font-black text-center mb-3" style={{ fontSize: 'clamp(1.5rem, 5vw, 3rem)', color: 'var(--text)' }}>
@@ -180,7 +170,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ===== Courses ===== */}
+      {/* Courses */}
       {courses?.length > 0 && (
         <section className="py-20 px-4">
           <div className="max-w-6xl mx-auto">
@@ -222,7 +212,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ===== Gallery ===== */}
+      {/* Gallery */}
       {gallery?.length > 0 && (
         <section className="py-20 px-4">
           <div className="max-w-6xl mx-auto">
@@ -247,7 +237,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ===== About ===== */}
+      {/* About */}
       {settings?.about_text && (
         <section className="py-20 px-4">
           <div className="max-w-4xl mx-auto p-8 md:p-10 rounded-3xl" style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
@@ -267,7 +257,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ===== Testimonials ===== */}
+      {/* Testimonials */}
       {testimonials?.length > 0 && (
         <section className="py-20 px-4">
           <div className="max-w-6xl mx-auto">
