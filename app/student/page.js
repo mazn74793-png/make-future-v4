@@ -1,13 +1,11 @@
 'use client';
-// ضيف import
-import { FiSun, FiMoon } from 'react-icons/fi';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import {
   FiBookOpen, FiLogOut, FiLock, FiUnlock, FiClock,
   FiSend, FiPlay, FiFileText, FiPackage, FiCheck,
-  FiHome, FiAward
+  FiHome, FiAward, FiSun, FiMoon
 } from 'react-icons/fi';
 
 export default function StudentPage() {
@@ -25,30 +23,58 @@ export default function StudentPage() {
   const [ordering, setOrdering] = useState(null);
   const [notes, setNotes] = useState({});
   const [activeTab, setActiveTab] = useState('home');
-  // ضيف state
-const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(true);
   const router = useRouter();
 
-  // ضيف useEffect
-useEffect(() => {
-  const saved = localStorage.getItem('theme');
-  setIsDark(saved ? saved === 'dark' : true);
-}, []);
+  // Theme
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    const dark = saved ? saved === 'dark' : true;
+    setIsDark(dark);
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.classList.toggle('light', !dark);
+  }, []);
 
-const toggleTheme = () => {
-  const next = !isDark;
-  setIsDark(next);
-  document.documentElement.classList.toggle('dark', next);
-  document.documentElement.classList.toggle('light', !next);
-  localStorage.setItem('theme', next ? 'dark' : 'light');
-};
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    document.documentElement.classList.toggle('light', !next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+  };
+
+  // تحديث last_seen كل دقيقة
+  const updatePresence = useCallback(async (studentId) => {
+    await supabase.from('students').update({ last_seen: new Date().toISOString() }).eq('id', studentId);
+  }, []);
+
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push('/login'); return; }
+
       const { data: studentData } = await supabase.from('students').select('*').eq('user_id', user.id).single();
       if (!studentData || studentData.status !== 'approved') { router.push('/pending'); return; }
       setStudent(studentData);
+
+      // أول تسجيل دخول
+      if (!studentData.first_login) {
+        await supabase.from('students').update({ first_login: true }).eq('id', studentData.id);
+        // سجّل إشعار واتساب
+        if (studentData.parent_phone) {
+          await supabase.from('whatsapp_notifications').insert({
+            student_id: studentData.id,
+            type: 'first_login',
+            phone: studentData.parent_phone,
+            message: `ولي أمر الطالب ${studentData.name}، تم تفعيل حساب نجلكم على منصتنا التعليمية بنجاح ✅`,
+          });
+        }
+      }
+
+      // تحديث presence
+      await updatePresence(studentData.id);
+      const presenceInterval = setInterval(() => updatePresence(studentData.id), 60000);
+
       const [
         { data: coursesData },
         { data: reqData },
@@ -63,11 +89,12 @@ const toggleTheme = () => {
         supabase.from('access_requests').select('*').eq('student_id', studentData.id),
         supabase.from('enrollments').select('course_id').eq('student_id', studentData.id).eq('is_active', true),
         supabase.from('exams').select('*').eq('is_active', true),
-        supabase.from('exam_attempts').select('exam_id, is_submitted, percentage').eq('student_id', studentData.id),
+        supabase.from('exam_attempts').select('exam_id, is_submitted, percentage, score, total_points, force_submitted').eq('student_id', studentData.id),
         supabase.from('videos').select('id'),
         supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }),
         supabase.from('product_orders').select('*, products(title)').eq('student_id', studentData.id),
       ]);
+
       setCourses(coursesData || []);
       setRequests(reqData || []);
       setEnrollments(enrollData?.map(e => e.course_id) || []);
@@ -77,9 +104,11 @@ const toggleTheme = () => {
       setMyOrders(ordersData || []);
       setStats({ videos: videosData?.length || 0, exams: examsData?.length || 0 });
       setLoading(false);
+
+      return () => clearInterval(presenceInterval);
     };
     load();
-  }, [router]);
+  }, [router, updatePresence]);
 
   const handleRequest = async (courseId) => {
     setRequesting(courseId);
@@ -90,7 +119,11 @@ const toggleTheme = () => {
 
   const handleOrder = async (productId) => {
     setOrdering(productId);
-    await supabase.from('product_orders').insert({ product_id: productId, student_id: student.id, student_name: student.name, student_phone: student.phone, notes: notes[productId] || '', status: 'pending' });
+    await supabase.from('product_orders').insert({
+      product_id: productId, student_id: student.id,
+      student_name: student.name, student_phone: student.phone,
+      notes: notes[productId] || '', status: 'pending'
+    });
     setMyOrders(prev => [...prev, { product_id: productId, status: 'pending' }]);
     setOrdering(null);
   };
@@ -116,25 +149,24 @@ const toggleTheme = () => {
   const statusLabel = { pending: '⏳ قيد المراجعة', confirmed: '✅ تم التأكيد', delivered: '📦 تم التسليم', cancelled: '❌ ملغي' };
 
   const tabs = [
-    { key: 'home', icon: <FiHome size={18} />, label: 'الرئيسية' },
-    { key: 'courses', icon: <FiBookOpen size={18} />, label: `الكورسات${enrolledCourses.length > 0 ? ` (${enrolledCourses.length})` : ''}` },
-    { key: 'exams', icon: <FiFileText size={18} />, label: `الامتحانات${exams.length > 0 ? ` (${exams.length})` : ''}` },
-    { key: 'products', icon: <FiPackage size={18} />, label: 'المنتجات' },
+    { key: 'home', icon: <FiHome size={17} />, label: 'الرئيسية' },
+    { key: 'courses', icon: <FiBookOpen size={17} />, label: `الكورسات (${enrolledCourses.length})` },
+    { key: 'exams', icon: <FiFileText size={17} />, label: `الامتحانات (${exams.length})` },
+    { key: 'products', icon: <FiPackage size={17} />, label: 'المنتجات' },
   ];
 
   return (
-    <div className="min-h-screen pb-24 md:pb-0 md:pt-16" dir="rtl"
-      style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+    <div className="min-h-screen pb-24 md:pb-0 md:pt-16 animated-bg" dir="rtl"
+      style={{ background: 'var(--bg)', color: 'var(--text)', position: 'relative' }}>
 
-      {/* ===== Header للموبايل فقط ===== */}
+      {/* Particles */}
+      <div className="p1" /><div className="p2" /><div className="p3" /><div className="p4" />
+      <div className="p5" /><div className="p6" /><div className="p7" /><div className="p8" />
+
+      {/* ===== Mobile Header ===== */}
       <div className="sticky top-0 z-30 md:hidden"
-        style={{
-          background: 'var(--glass-bg)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid var(--border)',
-        }}>
-        {/* User info */}
+        style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: '1px solid var(--border)' }}>
+        {/* User bar */}
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm flex-shrink-0"
@@ -142,78 +174,92 @@ const toggleTheme = () => {
               {student?.name?.[0]}
             </div>
             <div>
-              <p className="font-bold text-sm leading-tight" style={{ color: 'var(--text)' }}>
-                {student?.name?.split(' ')[0]}
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{student?.stage || 'طالب'}</p>
+              <p className="font-bold text-sm leading-tight" style={{ color: 'var(--text)' }}>{student?.name?.split(' ')[0]}</p>
+              <p className="text-xs font-mono" style={{ color: '#818cf8' }}>{student?.student_code}</p>
             </div>
           </div>
-          <button onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
-            style={{ color: '#f87171', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
-            <FiLogOut size={14} /> خروج
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Theme Toggle */}
+            <button onClick={toggleTheme}
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+              style={{
+                background: isDark ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.12)',
+                border: `1px solid ${isDark ? 'rgba(99,102,241,0.3)' : 'rgba(245,158,11,0.3)'}`,
+                color: isDark ? '#818cf8' : '#f59e0b',
+              }}>
+              {isDark ? <FiSun size={15} /> : <FiMoon size={15} />}
+            </button>
+            <button onClick={handleLogout}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-xl"
+              style={{ color: '#f87171', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
+              <FiLogOut size={13} /> خروج
+            </button>
+          </div>
         </div>
-              
-        <button onClick={toggleTheme}
-  className="flex items-center justify-center w-9 h-9 rounded-xl transition-all flex-shrink-0"
-  style={{
-    background: isDark ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.12)',
-    border: `1px solid ${isDark ? 'rgba(99,102,241,0.3)' : 'rgba(245,158,11,0.3)'}`,
-    color: isDark ? '#818cf8' : '#f59e0b',
-  }}>
-  {isDark ? <FiSun size={15}/> : <FiMoon size={15}/>}
-</button>
 
-        {/* Tabs scrollable */}
-        <div className="flex gap-1 px-4 pb-2 overflow-x-auto"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* Tabs */}
+        <div className="flex gap-1.5 px-4 pb-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {tabs.map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex-shrink-0 transition-all"
               style={activeTab === tab.key
                 ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white' }
                 : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-              {tab.icon}
-              {tab.label}
+              {tab.icon} {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ===== Desktop Sidebar Tabs ===== */}
-      <div className="hidden md:flex max-w-7xl mx-auto px-6 pt-6 gap-2 mb-6">
-        {tabs.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
-            style={activeTab === tab.key
-              ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white' }
-              : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-            {tab.icon}
-            {tab.label}
+      {/* ===== Desktop Tabs ===== */}
+      <div className="hidden md:flex max-w-7xl mx-auto px-6 pt-6 gap-2 mb-6 items-center justify-between">
+        <div className="flex gap-2">
+          {tabs.map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
+              style={activeTab === tab.key
+                ? { background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white' }
+                : { background: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
+        {/* Desktop user info + theme */}
+        <div className="flex items-center gap-3">
+          <div className="text-sm font-mono px-3 py-1.5 rounded-xl"
+            style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
+            {student?.student_code}
+          </div>
+          <button onClick={toggleTheme}
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+            style={{
+              background: isDark ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.12)',
+              border: `1px solid ${isDark ? 'rgba(99,102,241,0.3)' : 'rgba(245,158,11,0.3)'}`,
+              color: isDark ? '#818cf8' : '#f59e0b',
+            }}>
+            {isDark ? <FiSun size={15} /> : <FiMoon size={15} />}
           </button>
-        ))}
+          <button onClick={handleLogout}
+            className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-xl"
+            style={{ color: '#f87171', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
+            <FiLogOut size={14} /> خروج
+          </button>
+        </div>
       </div>
 
       {/* ===== Content ===== */}
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-0">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-0 relative z-10">
 
-        {/* HOME */}
+        {/* ========== HOME ========== */}
         {activeTab === 'home' && (
-          <div className="space-y-5">
-            {/* Hero Card */}
+          <div className="space-y-4">
+            {/* Hero */}
             <div className="relative rounded-2xl p-6 overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(244,114,182,0.08))',
-                border: '1px solid rgba(99,102,241,0.2)',
-              }}>
-              <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full"
-                style={{ background: 'rgba(99,102,241,0.1)', filter: 'blur(30px)' }} />
+              style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(244,114,182,0.06))', border: '1px solid rgba(99,102,241,0.18)' }}>
+              <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', filter: 'blur(30px)' }} />
               <div className="relative z-10">
-                <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--text)' }}>
-                  اهلاً {student?.name?.split(' ')[0]} 👋
-                </h1>
-                <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>استمر في رحلتك التعليمية!</p>
+                <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--text)' }}>اهلاً {student?.name?.split(' ')[0]} 👋</h1>
+                <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>استمر في رحلتك التعليمية!</p>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => setActiveTab('courses')}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold transition hover:opacity-90"
@@ -231,23 +277,25 @@ const toggleTheme = () => {
               </div>
             </div>
 
-     {/* كود الطالب */}
-<div className="rounded-2xl p-4 flex items-center justify-between"
-  style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
-  <div>
-    <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>كود الطالب الخاص بك</p>
-    <p className="text-2xl font-black font-mono tracking-widest" style={{ color: '#818cf8' }}>
-      {student?.student_code || '----'}
-    </p>
-  </div>
-  <div className="text-4xl">💳</div>
-</div>
+            {/* كود الطالب */}
+            <div className="rounded-2xl p-4 flex items-center justify-between"
+              style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)' }}>
+              <div>
+                <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>كود الطالب الخاص بك</p>
+                <p className="text-2xl font-black font-mono tracking-widest" style={{ color: '#818cf8' }}>
+                  {student?.student_code || '----'}
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-faint)' }}>استخدمه لتسجيل الحضور</p>
+              </div>
+              <div className="text-4xl">🎫</div>
+            </div>
+
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { icon: <FiBookOpen size={18} />, value: enrolledCourses.length, label: 'كورساتي', color: '#818cf8' },
-                { icon: <FiPlay size={18} />, value: stats.videos, label: 'فيديو', color: '#f472b6' },
-                { icon: <FiAward size={18} />, value: exams.length, label: 'امتحان', color: '#34d399' },
+                { icon: <FiBookOpen size={17} />, value: enrolledCourses.length, label: 'كورساتي', color: '#818cf8' },
+                { icon: <FiPlay size={17} />, value: stats.videos, label: 'فيديو', color: '#f472b6' },
+                { icon: <FiAward size={17} />, value: exams.length, label: 'امتحان', color: '#34d399' },
               ].map((s, i) => (
                 <div key={i} className="rounded-2xl p-4 text-center"
                   style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
@@ -272,7 +320,7 @@ const toggleTheme = () => {
                   {enrolledCourses.slice(0, 2).map(course => (
                     <a key={course.id} href={`/student/course/${course.id}`}
                       className="flex items-center gap-3 p-3 rounded-xl transition hover:opacity-90"
-                      style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                      style={{ background: 'var(--bg2)', border: '1px solid var(--border)', display: 'flex' }}>
                       {course.thumbnail_url
                         ? <img src={course.thumbnail_url} className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
                         : <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -283,7 +331,7 @@ const toggleTheme = () => {
                         <p className="font-bold text-sm truncate" style={{ color: 'var(--text)' }}>{course.title}</p>
                         <p className="text-xs mt-0.5" style={{ color: '#34d399' }}>✅ متاح</p>
                       </div>
-                      <FiPlay size={16} style={{ color: '#818cf8', flexShrink: 0 }} />
+                      <FiPlay size={15} style={{ color: '#818cf8', flexShrink: 0 }} />
                     </a>
                   ))}
                 </div>
@@ -302,15 +350,13 @@ const toggleTheme = () => {
                     const attempt = getExamAttempt(exam.id);
                     return (
                       <div key={exam.id} className="flex items-center justify-between p-3 rounded-xl"
-                        style={{ background: 'var(--bg2)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                        style={{ background: 'var(--bg2)', border: '1px solid rgba(99,102,241,0.12)' }}>
                         <div>
                           <p className="font-bold text-sm" style={{ color: 'var(--text)' }}>{exam.title}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            ⏱️ {exam.duration_minutes} دقيقة • {exam.pass_score}% للنجاح
-                          </p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>⏱️ {exam.duration_minutes} دقيقة • {exam.pass_score}% للنجاح</p>
                         </div>
                         {attempt?.is_submitted
-                          ? <span className="text-sm font-bold px-3 py-1 rounded-full"
+                          ? <span className="text-sm font-black px-3 py-1 rounded-full"
                               style={attempt.percentage >= exam.pass_score
                                 ? { background: 'rgba(52,211,153,0.15)', color: '#34d399' }
                                 : { background: 'rgba(248,113,113,0.15)', color: '#f87171' }}>
@@ -330,7 +376,7 @@ const toggleTheme = () => {
           </div>
         )}
 
-        {/* COURSES */}
+        {/* ========== COURSES ========== */}
         {activeTab === 'courses' && (
           <div className="space-y-6">
             {enrolledCourses.length > 0 && (
@@ -351,8 +397,7 @@ const toggleTheme = () => {
                           </div>}
                       <div className="p-4">
                         <h3 className="font-bold text-sm mb-2" style={{ color: 'var(--text)' }}>{course.title}</h3>
-                        <span className="text-xs px-2 py-1 rounded-full"
-                          style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399' }}>✅ متاح</span>
+                        <span className="text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399' }}>✅ متاح</span>
                       </div>
                     </a>
                   ))}
@@ -370,11 +415,10 @@ const toggleTheme = () => {
                     const reqStatus = getRequestStatus(course.id);
                     return (
                       <div key={course.id} className="rounded-2xl overflow-hidden"
-                        style={{ background: 'var(--bg2)', border: '1px solid var(--border)', opacity: 0.85 }}>
+                        style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
                         {course.thumbnail_url
                           ? <img src={course.thumbnail_url} alt={course.title} className="w-full h-36 object-cover" style={{ opacity: 0.6 }} />
-                          : <div className="w-full h-36 flex items-center justify-center"
-                              style={{ background: 'var(--bg3)' }}>
+                          : <div className="w-full h-36 flex items-center justify-center" style={{ background: 'var(--bg3)' }}>
                               <FiLock style={{ fontSize: '2rem', color: 'var(--text-faint)' }} />
                             </div>}
                         <div className="p-4">
@@ -383,13 +427,13 @@ const toggleTheme = () => {
                             <button onClick={() => handleRequest(course.id)} disabled={requesting === course.id}
                               className="w-full py-2 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
                               style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-                              {requesting === course.id ? '⏳' : <><FiSend size={14} /> اطلب الوصول</>}
+                              {requesting === course.id ? '⏳' : <><FiSend size={13} /> اطلب الوصول</>}
                             </button>
                           )}
                           {reqStatus === 'pending' && (
-                            <div className="w-full py-2 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1"
+                            <div className="w-full py-2 rounded-xl text-xs font-bold text-center"
                               style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}>
-                              <FiClock size={12} /> قيد المراجعة
+                              <FiClock className="inline ml-1" size={11} /> قيد المراجعة
                             </div>
                           )}
                           {reqStatus === 'rejected' && (
@@ -399,7 +443,7 @@ const toggleTheme = () => {
                             <a href={`/student/course/${course.id}`}
                               className="w-full py-2 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2"
                               style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex' }}>
-                              <FiPlay size={14} /> ادخل الكورس
+                              <FiPlay size={13} /> ادخل الكورس
                             </a>
                           )}
                         </div>
@@ -419,7 +463,7 @@ const toggleTheme = () => {
           </div>
         )}
 
-        {/* EXAMS */}
+        {/* ========== EXAMS ========== */}
         {activeTab === 'exams' && (
           <div>
             <h2 className="font-black mb-5" style={{ fontSize: '1.25rem', color: 'var(--text)' }}>📝 الامتحانات المتاحة</h2>
@@ -438,7 +482,7 @@ const toggleTheme = () => {
                     <div key={exam.id} className="p-5 rounded-2xl"
                       style={{
                         background: 'var(--bg2)',
-                        border: `1px solid ${submitted ? (passed ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)') : 'rgba(99,102,241,0.15)'}`,
+                        border: `1px solid ${submitted ? (passed ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)') : 'rgba(99,102,241,0.12)'}`,
                       }}>
                       <div className="flex items-center justify-between flex-wrap gap-4">
                         <div>
@@ -447,12 +491,10 @@ const toggleTheme = () => {
                             <span>⏱️ {exam.duration_minutes} دقيقة</span>
                             <span>🎯 نجاح من {exam.pass_score}%</span>
                           </div>
-                          {exam.instructions && (
-                            <p className="text-xs mt-2 line-clamp-2" style={{ color: 'var(--text-faint)' }}>{exam.instructions}</p>
-                          )}
                         </div>
-                        {submitted
-                          ? <div className="text-center">
+                        {submitted ? (
+                          <div className="flex items-center gap-3">
+                            <div className="text-center">
                               <p className="text-3xl font-black" style={{ color: passed ? '#34d399' : '#f87171' }}>
                                 {Math.round(attempt.percentage)}%
                               </p>
@@ -460,11 +502,19 @@ const toggleTheme = () => {
                                 {passed ? '✅ ناجح' : '❌ راسب'}
                               </p>
                             </div>
-                          : <a href={`/student/exam/${exam.id}`}
-                              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-sm transition hover:opacity-90"
-                              style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-                              <FiPlay size={14} /> ابدأ الامتحان
-                            </a>}
+                            <a href={`/student/exam/${exam.id}`}
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold"
+                              style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
+                              📊 التقرير
+                            </a>
+                          </div>
+                        ) : (
+                          <a href={`/student/exam/${exam.id}`}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-sm transition hover:opacity-90"
+                            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+                            <FiPlay size={14} /> ابدأ الامتحان
+                          </a>
+                        )}
                       </div>
                     </div>
                   );
@@ -474,7 +524,7 @@ const toggleTheme = () => {
           </div>
         )}
 
-        {/* PRODUCTS */}
+        {/* ========== PRODUCTS ========== */}
         {activeTab === 'products' && (
           <div>
             <h2 className="font-black mb-5" style={{ fontSize: '1.25rem', color: 'var(--text)' }}>📦 المنتجات المتاحة</h2>
@@ -497,9 +547,7 @@ const toggleTheme = () => {
                         </div>
                         <div className="flex-1">
                           <h3 className="font-black mb-1" style={{ color: 'var(--text)' }}>{product.title}</h3>
-                          {product.description && (
-                            <p className="text-sm mb-2" style={{ color: 'var(--text-muted)' }}>{product.description}</p>
-                          )}
+                          {product.description && <p className="text-sm mb-2" style={{ color: 'var(--text-muted)' }}>{product.description}</p>}
                           <div className="flex items-center gap-3 mb-3">
                             <span className="font-bold" style={{ color: '#818cf8' }}>{product.price} جنيه</span>
                             {product.available_count && (
@@ -519,7 +567,7 @@ const toggleTheme = () => {
                               <button onClick={() => handleOrder(product.id)} disabled={ordering === product.id}
                                 className="flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-bold disabled:opacity-50"
                                 style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
-                                {ordering === product.id ? '⏳ جاري...' : <><FiCheck size={14} /> اطلب الآن</>}
+                                {ordering === product.id ? '⏳ جاري...' : <><FiCheck size={13} /> اطلب الآن</>}
                               </button>
                             </div>
                           ) : (
