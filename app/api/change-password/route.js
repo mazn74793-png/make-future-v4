@@ -9,43 +9,73 @@ const supabaseAdmin = createClient(
 
 export async function POST(req) {
   try {
+    // 1. التأكد من صلاحية الأدمن (Security Layer)
+    const { data: { user: adminUser } } = await supabaseAdmin.auth.getUser(req.headers.get('Authorization')?.split(' ')[1] || '');
+    
+    const { data: isAdmin } = await supabaseAdmin
+      .from('admins')
+      .select('id')
+      .eq('email', adminUser?.email)
+      .single();
+
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'غير مسموح لك بالقيام بهذا الإجراء' }, { status: 403 });
+    }
+
     const { studentId, email, newPassword } = await req.json();
-    if (!newPassword || newPassword.length < 6) return NextResponse.json({ error: 'كلمة المرور أقل من 6 أحرف' });
+    if (!newPassword || newPassword.length < 6) {
+      return NextResponse.json({ error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
+    }
 
-    // جيب الطالب من DB
-    const { data: student } = await supabaseAdmin
-      .from('students').select('user_id, email').eq('id', studentId).single();
+    // 2. جلب بيانات الطالب من القاعدة
+    const { data: student, error: studentError } = await supabaseAdmin
+      .from('students')
+      .select('user_id, email')
+      .eq('id', studentId)
+      .single();
 
-    let userId = student?.user_id;
+    if (studentError || !student) return NextResponse.json({ error: 'الطالب غير موجود' });
 
-    // لو مفيش user_id — الطالب مش مسجل في auth لسه
+    let userId = student.user_id;
+    const targetEmail = email || student.email;
+
+    // 3. لو الطالب مش مربوط بـ Auth
     if (!userId) {
-      // ابحث بالإيميل في auth
-      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
-      const authUser = users?.find(u => u.email === (email || student?.email));
+      // بحث سريع عن طريق الإيميل بدلاً من listUsers الشاملة
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      const authUser = users?.find(u => u.email === targetEmail);
 
       if (authUser) {
         userId = authUser.id;
-        // ربط الـ user_id بالطالب
         await supabaseAdmin.from('students').update({ user_id: userId }).eq('id', studentId);
       } else {
-        // إنشاء حساب جديد للطالب
+        // إنشاء حساب جديد فوراً وتأكيده
         const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          email: email || student?.email,
+          email: targetEmail,
           password: newPassword,
-          email_confirm: true,
+          email_confirm: true, // تأكيد الإيميل تلقائياً
+          user_metadata: { role: 'student' } // إضافة رول الطالب في الميتاداتا
         });
+
         if (createError) return NextResponse.json({ error: createError.message });
+        
         userId = newUser.user.id;
         await supabaseAdmin.from('students').update({ user_id: userId }).eq('id', studentId);
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, message: 'تم إنشاء حساب جديد للطالب' });
       }
     }
 
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
-    if (error) return NextResponse.json({ error: error.message });
-    return NextResponse.json({ success: true });
+    // 4. تحديث الباسورد للحساب الموجود فعلياً
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, { 
+      password: newPassword,
+      email: targetEmail // تحديث الإيميل أيضاً لو الأدمن غيره
+    });
+
+    if (updateError) return NextResponse.json({ error: updateError.message });
+
+    return NextResponse.json({ success: true, message: 'تم تحديث البيانات بنجاح' });
+
   } catch (e) {
-    return NextResponse.json({ error: e.message });
+    return NextResponse.json({ error: 'حدث خطأ داخلي في الخادم' }, { status: 500 });
   }
 }
