@@ -1,4 +1,6 @@
 'use client';
+// ضيف import
+import { FiSun, FiMoon } from 'react-icons/fi';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -23,8 +25,23 @@ export default function StudentPage() {
   const [ordering, setOrdering] = useState(null);
   const [notes, setNotes] = useState({});
   const [activeTab, setActiveTab] = useState('home');
+  // ضيف state
+const [isDark, setIsDark] = useState(true);
   const router = useRouter();
 
+  // ضيف useEffect
+useEffect(() => {
+  const saved = localStorage.getItem('theme');
+  setIsDark(saved ? saved === 'dark' : true);
+}, []);
+
+const toggleTheme = () => {
+  const next = !isDark;
+  setIsDark(next);
+  document.documentElement.classList.toggle('dark', next);
+  document.documentElement.classList.toggle('light', !next);
+  localStorage.setItem('theme', next ? 'dark' : 'light');
+};
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
