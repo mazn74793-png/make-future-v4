@@ -1,205 +1,85 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { FiUsers, FiPlayCircle, FiCheck, FiX, FiActivity, FiLogOut, FiSearch, FiPhone } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { FiPlus, FiTrash2, FiBell } from 'react-icons/fi';
 
-export default function AdminDashboard() {
-  const [pendingStudents, setPendingStudents] = useState([]);
-  const [allStudents, setAllStudents] = useState([]); // لحفظ كل الطلاب للبحث
-  const [searchTerm, setSearchTerm] = useState('');
-  const [stats, setStats] = useState({ total: 0, pending: 0, courses: 0 });
-  const [loading, setLoading] = useState(true);
+export default function AnnouncementsPage() {
+  const [items, setItems] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ title: '', content: '', type: 'info' });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      // 1. جلب الطلبات المعلقة
-      const { data: pending } = await supabase
-        .from('students')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-      
-      setPendingStudents(pending || []);
-
-      // 2. إحصائيات سريعة (بـ Query واحدة لتحسين الأداء)
-      const { count: total } = await supabase.from('students').select('*', { count: 'exact', head: true });
-      const { count: courses } = await supabase.from('courses').select('*', { count: 'exact', head: true });
-      
-      setStats({ 
-        total: total || 0, 
-        pending: pending?.length || 0, 
-        courses: courses || 0 
-      });
-    } catch (error) {
-      toast.error('فشل في جلب البيانات');
-    } finally {
-      setLoading(false);
-    }
+  const load = async () => {
+    const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+    setItems(data || []);
   };
 
-  const handleAction = async (id, name, newStatus) => {
-    // تأكيد قبل الرفض مثلاً
-    if (newStatus === 'rejected' && !confirm(`هل أنت متأكد من رفض طلب ${name}؟`)) return;
+  useEffect(() => { load(); }, []);
 
-    const { error } = await supabase
-      .from('students')
-      .update({ status: newStatus })
-      .eq('id', id);
-
-    if (error) {
-      toast.error('حدث خطأ أثناء التحديث');
-    } else {
-      toast.success(newStatus === 'approved' ? `تم قبول ${name} 🎉` : 'تم الرفض');
-      fetchData(); 
-    }
+  const handleAdd = async () => {
+    if (!form.title || !form.content) { toast.error('كمل البيانات'); return; }
+    await supabase.from('announcements').insert(form);
+    toast.success('تم الاضافة');
+    setShowForm(false); setForm({ title: '', content: '', type: 'info' });
+    load();
   };
 
-  // تصفية الطلاب بناءً على البحث
-  const filteredStudents = pendingStudents.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.phone.includes(searchTerm)
-  );
+  const toggleActive = async (id, current) => {
+    await supabase.from('announcements').update({ is_active: !current }).eq('id', id);
+    load();
+  };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#09090b]">
-       <div className="relative">
-          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold">MR</div>
-       </div>
-    </div>
-  );
+  const handleDelete = async (id) => {
+    if (!confirm('متأكد؟')) return;
+    await supabase.from('announcements').delete().eq('id', id);
+    toast.success('اتمسح'); load();
+  };
+
+  const typeColors = { info: 'bg-purple-500/20 text-purple-400', warning: 'bg-yellow-500/20 text-yellow-400', success: 'bg-green-500/20 text-green-400', urgent: 'bg-red-500/20 text-red-400' };
 
   return (
-    <div className="min-h-screen bg-[#060608] text-white p-4 md:p-10 lg:px-20" dir="rtl">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
-        <div>
-          <h1 className="text-4xl font-black tracking-tighter">لوحة التحكم <span className="text-primary-light">الرئيسية</span></h1>
-          <p className="text-gray-500 font-medium mt-2">إدارة الطلاب، الكورسات، والطلبات المعلقة.</p>
-        </div>
-        <div className="flex gap-3">
-             <button onClick={fetchData} className="px-5 py-3 glass rounded-2xl text-sm font-bold hover:bg-white/10 transition-all">تحديث البيانات</button>
-             <button 
-              onClick={() => { supabase.auth.signOut(); window.location.href = '/login'; }}
-              className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/5"
-            >
-              <FiLogOut size={20} />
-            </button>
-        </div>
+    <div>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-black">الاعلانات</h1>
+        <button onClick={() => setShowForm(!showForm)} className="gradient-primary px-6 py-3 rounded-xl text-white font-bold flex items-center gap-2">
+          <FiPlus /> {showForm ? 'الغاء' : 'اعلان جديد'}
+        </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-        <StatCard icon={<FiUsers />} label="إجمالي المنضمين" value={stats.total} color="blue" />
-        <StatCard icon={<FiActivity />} label="طلبات قيد الانتظار" value={stats.pending} color="yellow" />
-        <StatCard icon={<FiPlayCircle />} label="المحتوى التعليمي" value={`${stats.courses} كورس`} color="purple" />
-      </div>
-
-      {/* Main Content Area */}
-      <div className="glass rounded-[2.5rem] border border-white/5 shadow-2xl overflow-hidden">
-        {/* Table Header & Search */}
-        <div className="p-8 border-b border-white/5 flex flex-col lg:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-4">
-              <div className="w-3 h-8 gradient-primary rounded-full" />
-              <h2 className="text-2xl font-black">طلبات الانضمام</h2>
-          </div>
-          
-          <div className="relative w-full lg:w-96 group">
-            <FiSearch className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="ابحث باسم الطالب أو رقم الهاتف..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pr-12 pl-4 text-sm focus:border-primary/50 focus:outline-none transition-all"
-            />
-          </div>
+      {showForm && (
+        <div className="glass rounded-2xl p-6 mb-8 animate-fade-in space-y-4">
+          <input type="text" value={form.title} onChange={(e) => setForm({...form, title: e.target.value})}
+            placeholder="عنوان الاعلان" className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none" />
+          <textarea value={form.content} onChange={(e) => setForm({...form, content: e.target.value})}
+            placeholder="محتوى الاعلان" rows={3} className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none resize-none" />
+          <select value={form.type} onChange={(e) => setForm({...form, type: e.target.value})}
+            className="bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-purple-500 focus:outline-none">
+            <option value="info">معلومة</option>
+            <option value="success">نجاح</option>
+            <option value="warning">تحذير</option>
+            <option value="urgent">عاجل</option>
+          </select>
+          <button onClick={handleAdd} className="gradient-primary px-8 py-3 rounded-xl text-white font-bold">اضافة</button>
         </div>
+      )}
 
-        {/* Desktop Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="bg-white/[0.02] text-gray-500 text-xs font-black uppercase tracking-widest">
-                <th className="px-8 py-5">بيانات الطالب</th>
-                <th className="px-8 py-5">المرحلة الدراسية</th>
-                <th className="px-8 py-5">المدرسة والتواصل</th>
-                <th className="px-8 py-5 text-center">التحكم</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-white/[0.01] transition-all group">
-                  <td className="px-8 py-6">
-                    <div className="font-black text-white group-hover:text-primary-light transition-colors">{student.name}</div>
-                    <div className="text-xs text-gray-500 mt-1 font-medium">{student.email}</div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="bg-purple-500/10 text-purple-400 px-3 py-1 rounded-lg text-xs font-bold border border-purple-500/10">
-                      {student.stage}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="text-sm font-bold text-gray-300">{student.school}</div>
-                    <a href={`https://wa.me/2${student.phone}`} target="_blank" className="text-xs text-gray-500 hover:text-green-400 flex items-center gap-1 mt-1 transition-colors">
-                      <FiPhone size={10} /> {student.phone}
-                    </a>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex justify-center gap-3">
-                      <button 
-                        onClick={() => handleAction(student.id, student.name, 'approved')}
-                        className="w-10 h-10 flex items-center justify-center bg-emerald-500/10 text-emerald-500 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-lg shadow-emerald-500/5"
-                        title="قبول الطالب"
-                      >
-                        <FiCheck size={20} />
-                      </button>
-                      <button 
-                        onClick={() => handleAction(student.id, student.name, 'rejected')}
-                        className="w-10 h-10 flex items-center justify-center bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-lg shadow-red-500/5"
-                        title="رفض الطلب"
-                      >
-                        <FiX size={20} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {filteredStudents.length === 0 && (
-            <div className="py-20 text-center">
-              <div className="text-gray-600 mb-2 font-bold text-lg">لا توجد نتائج بحث تطابق مدخلاتك</div>
-              <p className="text-gray-700 text-sm italic">تأكد من كتابة الاسم بشكل صحيح</p>
+      <div className="space-y-3">
+        {items.map((a, i) => (
+          <div key={a.id} className="glass rounded-xl p-4 flex items-center gap-4 animate-fade-in" style={{ animationDelay: `${i * 0.05}s` }}>
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white/5"><FiBell /></div>
+            <div className="flex-1">
+              <h3 className="font-bold">{a.title}</h3>
+              <p className="text-gray-400 text-sm">{a.content}</p>
             </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value, color }) {
-  const colors = {
-    blue: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
-    yellow: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
-    purple: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
-  };
-  return (
-    <div className={`glass p-8 rounded-[2.5rem] border ${colors[color]} flex items-center gap-6 transition-transform hover:-translate-y-1`}>
-      <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl shadow-inner ${colors[color]}`}>
-        {icon}
-      </div>
-      <div>
-        <p className="text-gray-500 text-xs font-black uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-3xl font-black text-white">{value}</p>
+            <span className={`text-xs px-3 py-1 rounded-full ${typeColors[a.type]}`}>{a.type}</span>
+            <button onClick={() => toggleActive(a.id, a.is_active)}
+              className={`text-xs px-3 py-1 rounded-full ${a.is_active ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-gray-500'}`}>
+              {a.is_active ? 'مفعل' : 'متوقف'}
+            </button>
+            <button onClick={() => handleDelete(a.id)} className="p-2 rounded-lg bg-red-500/20 text-red-400"><FiTrash2 /></button>
+          </div>
+        ))}
+        {items.length === 0 && <p className="text-center text-gray-500 py-10">مفيش اعلانات لسه</p>}
       </div>
     </div>
   );
