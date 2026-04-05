@@ -17,23 +17,18 @@ export default function RootLayout({ children }) {
                 try {
                   const savedTheme = localStorage.getItem('theme') || 'dark';
                   document.documentElement.classList.toggle('dark', savedTheme === 'dark');
-                  document.documentElement.classList.toggle('light', savedTheme === 'light');
                 } catch (e) {}
               })();
             `,
           }}
         />
       </head>
-      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-indigo-500/30">
+      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
         <div className="site-bg" aria-hidden="true">
-          <div className="aurora-orb aurora-orb-1 bg-indigo-500/30" />
-          <div className="aurora-orb aurora-orb-2 bg-purple-500/30" />
+          <div className="aurora-orb bg-indigo-500/20 top-[-10%] left-[-10%]" />
+          <div className="aurora-orb bg-purple-500/20 bottom-[-10%] right-[-10%]" />
         </div>
-
-        <main className="relative z-10">
-          {children}
-        </main>
-
+        <main className="relative z-10">{children}</main>
         <Toaster position="top-center" />
       </body>
     </html>
