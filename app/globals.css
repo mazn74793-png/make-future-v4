@@ -75,13 +75,14 @@
 html {
   overflow-x: hidden;
   scroll-behavior: smooth;
+  background: var(--bg);
+  color: var(--text);
 }
 
 body {
   font-family: 'Tajawal', sans-serif;
   direction: rtl;
-  background: var(--bg);
-  color: var(--text);
+  background: transparent;
   overflow-x: hidden;
   word-break: break-word;
   transition: background 0.3s ease, color 0.3s ease;
@@ -155,17 +156,10 @@ body::before {
 .animate-spin      { animation: spin 0.8s linear infinite; }
 
 /* ===== Gradients ===== */
-.gradient-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-}
-.gradient-dark {
-  background: var(--bg);
-}
-.gradient-card {
-  background: var(--bg2);
-}
+.gradient-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); }
+.gradient-dark    { background: var(--bg); }
+.gradient-card    { background: var(--bg2); }
 
-/* Morphing hero gradient */
 .gradient-hero {
   background: linear-gradient(-45deg, #09090b, #1a0a2e, #0d1117, #0a1628);
   background-size: 400% 400%;
@@ -241,10 +235,8 @@ body::before {
   animation: shimmer 1.5s linear infinite;
 }
 
-/* ===== Pulse Ring (online indicator) ===== */
-.pulse-ring {
-  position: relative;
-}
+/* ===== Pulse Ring ===== */
+.pulse-ring { position: relative; }
 .pulse-ring::after {
   content: '';
   position: absolute;
@@ -262,16 +254,8 @@ body::before {
   pointer-events: none;
   will-change: transform;
 }
-.orb-primary {
-  background: rgba(99,102,241,0.18);
-  width: 400px;
-  height: 400px;
-}
-.orb-accent {
-  background: rgba(244,114,182,0.10);
-  width: 300px;
-  height: 300px;
-}
+.orb-primary { background: rgba(99,102,241,0.18); width: 400px; height: 400px; }
+.orb-accent  { background: rgba(244,114,182,0.10); width: 300px; height: 300px; }
 .light .orb-primary { background: rgba(99,102,241,0.10); }
 .light .orb-accent  { background: rgba(244,114,182,0.07); }
 
@@ -316,13 +300,8 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--primary);
   background: var(--surface-hover);
 }
-input::placeholder, textarea::placeholder {
-  color: var(--text-faint);
-}
-option {
-  background: var(--bg2);
-  color: var(--text);
-}
+input::placeholder, textarea::placeholder { color: var(--text-faint); }
+option { background: var(--bg2); color: var(--text); }
 
 /* ===== Stat Numbers ===== */
 .stat-number {
@@ -382,7 +361,6 @@ video { max-width: 100%; border-radius: 12px; }
   transition-duration: 0.25s;
   transition-timing-function: ease;
 }
-/* Reset transition for animated elements */
 .animate-fade-in, .animate-float, .animate-glow,
 .card-hover, button, a { transition: all 0.25s ease; }
 
@@ -407,6 +385,70 @@ video { max-width: 100%; border-radius: 12px; }
 .light .gradient-dark { background: var(--bg) !important; }
 .light .gradient-card { background: var(--bg2) !important; }
 
+/* ===== Aurora Background ===== */
+@keyframes aurora-1 {
+  0%   { transform: translate(0%, 0%) scale(1); }
+  25%  { transform: translate(8%, -12%) scale(1.08); }
+  50%  { transform: translate(-5%, 10%) scale(0.95); }
+  75%  { transform: translate(-10%, -5%) scale(1.05); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes aurora-2 {
+  0%   { transform: translate(0%, 0%) scale(1); }
+  30%  { transform: translate(-10%, 8%) scale(1.1); }
+  60%  { transform: translate(8%, -10%) scale(0.92); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes aurora-3 {
+  0%   { transform: translate(0%, 0%) scale(1); }
+  35%  { transform: translate(12%, 6%) scale(0.96); }
+  70%  { transform: translate(-6%, -12%) scale(1.06); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+@keyframes aurora-4 {
+  0%   { transform: translate(0%, 0%) scale(1); }
+  40%  { transform: translate(-8%, -8%) scale(1.12); }
+  80%  { transform: translate(10%, 5%) scale(0.94); }
+  100% { transform: translate(0%, 0%) scale(1); }
+}
+
+.aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  will-change: transform;
+}
+
+.aurora-orb-1 {
+  width: 700px; height: 700px;
+  background: radial-gradient(circle, rgba(99,102,241,0.45) 0%, transparent 70%);
+  top: -10%; right: -5%;
+  animation: aurora-1 18s ease-in-out infinite;
+}
+.aurora-orb-2 {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(244,114,182,0.38) 0%, transparent 70%);
+  bottom: 5%; left: -10%;
+  animation: aurora-2 22s ease-in-out infinite;
+}
+.aurora-orb-3 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(52,211,153,0.25) 0%, transparent 70%);
+  top: 40%; left: 30%;
+  animation: aurora-3 26s ease-in-out infinite;
+}
+.aurora-orb-4 {
+  width: 450px; height: 450px;
+  background: radial-gradient(circle, rgba(139,92,246,0.32) 0%, transparent 70%);
+  top: 20%; left: -5%;
+  animation: aurora-4 20s ease-in-out infinite;
+}
+
+.light .aurora-orb-1 { background: radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 70%); }
+.light .aurora-orb-2 { background: radial-gradient(circle, rgba(244,114,182,0.12) 0%, transparent 70%); }
+.light .aurora-orb-3 { background: radial-gradient(circle, rgba(52,211,153,0.09) 0%, transparent 70%); }
+.light .aurora-orb-4 { background: radial-gradient(circle, rgba(139,92,246,0.11) 0%, transparent 70%); }
+
 /* ===== Animated Background Particles ===== */
 @keyframes particle-float {
   0%   { transform: translateY(0) translateX(0) scale(1); opacity: 0.6; }
@@ -426,10 +468,7 @@ video { max-width: 100%; border-radius: 12px; }
   75%  { background-position: 0% 100%; }
 }
 
-.animated-bg {
-  position: relative;
-  overflow: hidden;
-}
+.animated-bg { position: relative; overflow: hidden; }
 .animated-bg::before {
   content: '';
   position: fixed;
@@ -460,7 +499,6 @@ video { max-width: 100%; border-radius: 12px; }
 .p7 { width: 5px; height: 5px; background: rgba(99,102,241,0.3); animation: particle-float 13s ease-in-out infinite 4s; top: 45%; left: 80%; }
 .p8 { width: 3px; height: 3px; background: rgba(244,114,182,0.5); animation: particle-drift 7s ease-in-out infinite 2s; top: 90%; right: 50%; }
 
-/* Light mode particles */
 .light .p1, .light .p3, .light .p7 { background: rgba(99,102,241,0.25); }
 .light .p2, .light .p5, .light .p8 { background: rgba(244,114,182,0.2); }
-.light .p4, .light .p6 { background: rgba(99,102,241,0.2); }
+.light .p4, .light .p6             { background: rgba(99,102,241,0.2); }
