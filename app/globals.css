@@ -1,352 +1,346 @@
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+'use client';
+import { useEffect, useState, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import {
+  FiBookOpen, FiLogOut, FiLock, FiUnlock, FiClock,
+  FiSend, FiPlay, FiFileText, FiPackage, FiCheck,
+  FiHome, FiAward, FiSun, FiMoon
+} from 'react-icons/fi';
 
-/* ===== CSS Variables ===== */
-:root {
-  --primary: #6366f1;
-  --primary-light: #818cf8;
-  --primary-dark: #4f46e5;
-  --accent: #f472b6;
-  --accent2: #34d399;
+export default function StudentPage() {
+  const [student, setStudent] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
+  const [exams, setExams] = useState([]);
+  const [attempts, setAttempts] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [myOrders, setMyOrders] = useState([]);
+  const [stats, setStats] = useState({ videos: 0, exams: 0 });
+  const [loading, setLoading] = useState(true);
+  const [requesting, setRequesting] = useState(null);
+  const [ordering, setOrdering] = useState(null);
+  const [notes, setNotes] = useState({});
+  const [activeTab, setActiveTab] = useState('home');
+  const [isDark, setIsDark] = useState(true);
+  const router = useRouter();
 
-  --bg: #09090b;
-  --bg2: #111116;
-  --bg3: #18181f;
-  --surface: rgba(255,255,255,0.04);
-  --surface-hover: rgba(255,255,255,0.08);
-  --border: rgba(255,255,255,0.08);
-  --border-strong: rgba(255,255,255,0.15);
-  --text: #f4f4f5;
-  --text-muted: #a1a1aa;
-  --text-faint: #52525b;
-  --glass-bg: rgba(255,255,255,0.04);
-  --glass-border: rgba(255,255,255,0.08);
-  --glass: rgba(255,255,255,0.03);
-  --shadow-colored: 0 8px 32px rgba(99,102,241,0.15);
-}
+  // --- إدارة الثيم (Theme) متوافق مع CSS الخاص بك ---
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    const dark = saved ? saved === 'dark' : true;
+    setIsDark(dark);
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.classList.toggle('light', !dark);
+  }, []);
 
-.light {
-  --bg: #fafaf8;
-  --bg2: #f4f4f0;
-  --bg3: #ededea;
-  --surface: rgba(0,0,0,0.03);
-  --surface-hover: rgba(0,0,0,0.06);
-  --border: rgba(0,0,0,0.08);
-  --border-strong: rgba(0,0,0,0.15);
-  --text: #18181b;
-  --text-muted: #52525b;
-  --text-faint: #a1a1aa;
-  --glass-bg: rgba(255,255,255,0.7);
-  --glass-border: rgba(0,0,0,0.08);
-  --glass: rgba(0,0,0,0.02);
-  --shadow-colored: 0 8px 32px rgba(99,102,241,0.10);
-}
+  const toggleTheme = () => {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    document.documentElement.classList.toggle('light', !next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+  };
 
-/* ===== Base ===== */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  // --- جلب البيانات ---
+  useEffect(() => {
+    const loadData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/login'); return; }
 
-html {
-  overflow-x: hidden;
-  scroll-behavior: smooth;
-}
+      const { data: studentData } = await supabase.from('students').select('*').eq('user_id', user.id).single();
+      if (!studentData || studentData.status !== 'approved') { router.push('/pending'); return; }
+      setStudent(studentData);
 
-body {
-  font-family: 'Tajawal', sans-serif;
-  direction: rtl;
-  background: var(--bg);
-  color: var(--text);
-  overflow-x: hidden;
-  word-break: break-word;
-  min-height: 100dvh;
-  transition: background 0.3s ease, color 0.3s ease;
-}
+      const [
+        { data: coursesData },
+        { data: reqData },
+        { data: enrollData },
+        { data: examsData },
+        { data: attemptsData },
+        { data: videosData },
+        { data: productsData },
+        { data: ordersData },
+      ] = await Promise.all([
+        supabase.from('courses').select('*').eq('is_published', true).order('order'),
+        supabase.from('access_requests').select('*').eq('student_id', studentData.id),
+        supabase.from('enrollments').select('course_id').eq('student_id', studentData.id).eq('is_active', true),
+        supabase.from('exams').select('*').eq('is_active', true),
+        supabase.from('exam_attempts').select('exam_id, is_submitted, percentage').eq('student_id', studentData.id),
+        supabase.from('videos').select('id'),
+        supabase.from('products').select('*').eq('is_active', true).order('created_at', { ascending: false }),
+        supabase.from('product_orders').select('*, products(title)').eq('student_id', studentData.id),
+      ]);
 
-/* ===== Scrollbar ===== */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: var(--bg2); }
-::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 99px; }
+      setCourses(coursesData || []);
+      setRequests(reqData || []);
+      setEnrollments(enrollData?.map(e => e.course_id) || []);
+      setExams(examsData || []);
+      setAttempts(attemptsData || []);
+      setProducts(productsData || []);
+      setMyOrders(ordersData || []);
+      setStats({ videos: videosData?.length || 0, exams: examsData?.length || 0 });
+      setLoading(false);
+    };
+    loadData();
+  }, [router]);
 
-/* ===== Keyframes ===== */
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  33%  { transform: translateY(-12px) rotate(1deg); }
-  66%  { transform: translateY(-6px) rotate(-1deg); }
-}
-@keyframes morphGrad {
-  0%, 100% { background-position: 0% 50%; }
-  50%       { background-position: 100% 50%; }
-}
-@keyframes shimmer {
-  0%   { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-@keyframes pulseRing {
-  0%   { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(1.8); opacity: 0; }
-}
-@keyframes particle-float {
-  0%, 100% { transform: translateY(0) translateX(0) scale(1); opacity: 0.6; }
-  33%  { transform: translateY(-40px) translateX(15px) scale(1.05); opacity: 0.4; }
-  66%  { transform: translateY(-20px) translateX(-10px) scale(0.95); opacity: 0.5; }
-}
-@keyframes particle-drift {
-  0%   { transform: translateY(0) translateX(0); }
-  50%  { transform: translateY(-60px) translateX(30px); }
-  100% { transform: translateY(0) translateX(0); }
-}
-@keyframes aurora-1 {
-  0%   { transform: translate(0%,0%) scale(1); }
-  33%  { transform: translate(3%,-4%) scale(1.05); }
-  66%  { transform: translate(-2%,3%) scale(0.97); }
-  100% { transform: translate(0%,0%) scale(1); }
-}
-@keyframes aurora-2 {
-  0%   { transform: translate(0%,0%) scale(1); }
-  40%  { transform: translate(-4%,5%) scale(1.08); }
-  80%  { transform: translate(3%,-3%) scale(0.95); }
-  100% { transform: translate(0%,0%) scale(1); }
-}
-@keyframes aurora-3 {
-  0%   { transform: translate(0%,0%) scale(1); }
-  50%  { transform: translate(5%,3%) scale(1.03); }
-  100% { transform: translate(0%,0%) scale(1); }
-}
-@keyframes aurora-4 {
-  0%   { transform: translate(0%,0%) scale(1); }
-  30%  { transform: translate(-3%,-5%) scale(1.06); }
-  60%  { transform: translate(4%,2%) scale(0.96); }
-  100% { transform: translate(0%,0%) scale(1); }
-}
+  // --- الأكشنز (Actions) ---
+  const handleRequest = async (courseId) => {
+    setRequesting(courseId);
+    await supabase.from('access_requests').insert({ student_id: student.id, course_id: courseId, status: 'pending' });
+    setRequests(prev => [...prev, { course_id: courseId, status: 'pending' }]);
+    setRequesting(null);
+  };
 
-/* ===== Animation Classes ===== */
-.animate-fade-in  { animation: fadeUp 0.5s cubic-bezier(.16,1,.3,1) forwards; opacity: 0; }
-.animate-float    { animation: float 5s ease-in-out infinite; }
-.animate-glow     { animation: morphGrad 4s ease infinite; background-size: 200% 200%; }
-.animate-shimmer  { animation: shimmer 2s linear infinite; }
-.animate-spin     { animation: spin 0.8s linear infinite; }
-.reveal           { animation: fadeUp 0.8s cubic-bezier(.16,1,.3,1) forwards; opacity: 0; }
+  const handleOrder = async (productId) => {
+    setOrdering(productId);
+    const { data, error } = await supabase.from('product_orders').insert({
+      product_id: productId, student_id: student.id,
+      student_name: student.name, student_phone: student.phone,
+      notes: notes[productId] || '', status: 'pending'
+    }).select().single();
+    if (!error) setMyOrders(prev => [...prev, data]);
+    setOrdering(null);
+  };
 
-/* ===== Aurora Background ===== */
-.aurora-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  will-change: transform;
-  pointer-events: none;
-}
-.aurora-orb-1 {
-  width: 700px; height: 700px;
-  background: radial-gradient(circle, rgba(99,102,241,0.4) 0%, transparent 70%);
-  top: -10%; right: -5%;
-  animation: aurora-1 18s ease-in-out infinite;
-}
-.aurora-orb-2 {
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(244,114,182,0.32) 0%, transparent 70%);
-  bottom: 5%; left: -10%;
-  animation: aurora-2 22s ease-in-out infinite;
-}
-.aurora-orb-3 {
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(52,211,153,0.2) 0%, transparent 70%);
-  top: 40%; left: 30%;
-  animation: aurora-3 26s ease-in-out infinite;
-}
-.aurora-orb-4 {
-  width: 450px; height: 450px;
-  background: radial-gradient(circle, rgba(139,92,246,0.28) 0%, transparent 70%);
-  top: 20%; left: -5%;
-  animation: aurora-4 20s ease-in-out infinite;
-}
-.light .aurora-orb-1 { background: radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%); }
-.light .aurora-orb-2 { background: radial-gradient(circle, rgba(244,114,182,0.08) 0%, transparent 70%); }
-.light .aurora-orb-3 { background: radial-gradient(circle, rgba(52,211,153,0.06) 0%, transparent 70%); }
-.light .aurora-orb-4 { background: radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%); }
+  const getRequestStatus = (courseId) => requests.find(r => r.course_id === courseId)?.status || null;
+  const getExamAttempt = (examId) => attempts.find(a => a.exam_id === examId);
+  const getOrder = (productId) => myOrders.find(o => o.product_id === productId);
 
-/* site-bg للتوافق مع الكود القديم */
-.site-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
+      <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+    </div>
+  );
 
-/* ===== Glass ===== */
-.glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px) saturate(1.5);
-  -webkit-backdrop-filter: blur(16px) saturate(1.5);
-  border: 1px solid var(--glass-border);
-  transition: background 0.3s ease, border-color 0.3s ease;
-}
-.glass:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-strong);
-}
-.glass-card {
-  background: var(--glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  transition: all 0.3s ease;
-}
-.glass-card:hover {
-  border-color: var(--primary);
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-colored);
-}
+  const enrolledCourses = courses.filter(c => enrollments.includes(c.id) || c.visibility === 'public');
+  const availableCourses = courses.filter(c => !enrollments.includes(c.id) && c.visibility !== 'public');
+  const statusLabel = { pending: '⏳ معلق', confirmed: '✅ مؤكد', delivered: '📦 تم', cancelled: '❌ ملغي' };
 
-/* ===== Cards ===== */
-.card-hover {
-  transition: transform 0.3s cubic-bezier(.16,1,.3,1), box-shadow 0.3s ease;
-  border-radius: 16px;
-  will-change: transform;
-}
-.card-hover:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-colored);
-}
+  const tabs = [
+    { key: 'home', icon: <FiHome />, label: 'الرئيسية' },
+    { key: 'courses', icon: <FiBookOpen />, label: 'كورساتي' },
+    { key: 'exams', icon: <FiFileText />, label: 'الامتحانات' },
+    { key: 'products', icon: <FiPackage />, label: 'المتجر' },
+  ];
 
-/* ===== Gradients ===== */
-.gradient-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%); }
-.gradient-dark    { background: var(--bg); }
-.gradient-card    { background: var(--bg2); }
+  return (
+    <div className="min-h-screen relative overflow-hidden transition-colors duration-300">
+      
+      {/* ===== خلفية Aurora المتفاعلة (من ملف الـ CSS الخاص بك) ===== */}
+      <div className="site-bg">
+        <div className="aurora-orb aurora-orb-1" />
+        <div className="aurora-orb aurora-orb-2" />
+        <div className="aurora-orb aurora-orb-3" />
+        <div className="aurora-orb aurora-orb-4" />
+        <div className="p1 particle" /><div className="p2 particle" /><div className="p3 particle" />
+      </div>
 
-/* ===== Inputs ===== */
-input, select, textarea {
-  font-family: 'Tajawal', sans-serif;
-  direction: rtl;
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
-  padding: 12px !important;
-  color: var(--text) !important;
-  transition: border-color 0.2s ease, background 0.2s ease;
-}
-input:focus, select:focus, textarea:focus {
-  outline: none !important;
-  border-color: var(--primary) !important;
-  background: var(--surface-hover) !important;
-}
-input::placeholder, textarea::placeholder { color: var(--text-faint) !important; }
-option { background: var(--bg2); color: var(--text); }
+      {/* ===== Navbar (Glass Design) ===== */}
+      <nav className="fixed top-0 left-0 right-0 glass z-50 px-4">
+        <div className="max-w-7xl mx-auto h-full flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center text-white font-bold shadow-lg">
+              {student?.name?.[0]}
+            </div>
+            <span className="font-bold text-sm hidden sm:block">{student?.name}</span>
+          </div>
 
-/* ===== Typography ===== */
-.line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+          <div className="hidden md:flex gap-1">
+            {tabs.map(tab => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                className={`px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${activeTab === tab.key ? 'bg-indigo-500 text-white shadow-lg scale-105' : 'text-[var(--text-muted)] hover:bg-[var(--surface)]'}`}>
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
 
-/* ===== Mobile Fix ===== */
-.min-h-screen { min-height: 100dvh !important; }
-.h-screen     { height: 100dvh !important; }
+          <div className="flex items-center gap-3">
+            <button onClick={toggleTheme} className="w-9 h-9 glass-card flex items-center justify-center rounded-xl transition-transform active:scale-90">
+              {isDark ? <FiSun className="text-amber-400" /> : <FiMoon className="text-indigo-500" />}
+            </button>
+            <button onClick={() => supabase.auth.signOut()} className="text-red-500 hover:bg-red-500/10 p-2 rounded-xl transition-colors">
+              <FiLogOut size={20} />
+            </button>
+          </div>
+        </div>
+      </nav>
 
-/* ===== Navbar ===== */
-nav.fixed {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  z-index: 50;
-}
-.nav-spacer { height: 70px; }
-@media (max-width: 768px) { .nav-spacer { height: 60px; } }
+      <div className="nav-spacer" />
 
-/* ===== Nav Tabs ===== */
-.nav-tabs-scroll {
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  display: flex;
-  gap: 4px;
-  flex-wrap: nowrap;
-}
-.nav-tabs-scroll::-webkit-scrollbar { display: none; }
+      {/* ===== المحتوى الرئيسي ===== */}
+      <main className="max-w-7xl mx-auto px-4 py-8 relative z-10">
 
-/* ===== Video ===== */
-video { max-width: 100%; border-radius: 12px; }
-.aspect-video {
-  position: relative;
-  padding-bottom: 56.25%;
-  height: 0;
-  overflow: hidden;
-  border-radius: 12px;
-}
-.aspect-video iframe, .aspect-video video {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  border-radius: 12px;
-}
+        {/* --- HOME TAB --- */}
+        {activeTab === 'home' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8 animate-fade-in">
+              <div className="glass-card p-10 relative overflow-hidden group">
+                <div className="relative z-10">
+                  <h1 className="text-4xl font-black mb-4 gradient-primary bg-clip-text text-transparent">أهلاً، {student?.name?.split(' ')[0]}!</h1>
+                  <p className="text-[var(--text-muted)] max-w-md mb-8 leading-relaxed">
+                    استعد لتجربة تعليمية مميزة. لديك اليوم {enrolledCourses.length} كورسات نشطة و {exams.length} اختبارات متاحة.
+                  </p>
+                  <button onClick={() => setActiveTab('courses')} className="gradient-primary text-white px-8 py-3 rounded-2xl font-bold shadow-xl hover:scale-105 transition-transform">
+                    متابعة التعلم
+                  </button>
+                </div>
+                <FiAward className="absolute -bottom-8 -left-8 text-indigo-500/10 rotate-12 group-hover:scale-110 transition-transform duration-700" size={240} />
+              </div>
 
-/* ===== Particles ===== */
-.particle {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  will-change: transform, opacity;
-  filter: blur(1px);
-}
-.p1 { width:4px; height:4px; background:rgba(99,102,241,0.4); animation:particle-float 8s ease-in-out infinite; top:15%; right:20%; }
-.p2 { width:3px; height:3px; background:rgba(244,114,182,0.4); animation:particle-drift 12s ease-in-out infinite; top:35%; left:15%; }
-.p3 { width:5px; height:5px; background:rgba(52,211,153,0.3); animation:particle-float 10s ease-in-out infinite 2s; top:60%; right:30%; }
-.p4 { width:3px; height:3px; background:rgba(99,102,241,0.5); animation:particle-drift 9s ease-in-out infinite 1s; top:80%; left:25%; }
-.p5 { width:4px; height:4px; background:rgba(244,114,182,0.3); animation:particle-float 14s ease-in-out infinite 3s; top:25%; left:60%; }
-.p6 { width:3px; height:3px; background:rgba(52,211,153,0.4); animation:particle-drift 11s ease-in-out infinite 0.5s; top:70%; right:10%; }
-.p7 { width:5px; height:5px; background:rgba(99,102,241,0.3); animation:particle-float 13s ease-in-out infinite 4s; top:45%; left:80%; }
-.p8 { width:3px; height:3px; background:rgba(244,114,182,0.5); animation:particle-drift 7s ease-in-out infinite 2s; top:90%; right:50%; }
-.light .p1,.light .p3,.light .p7 { background:rgba(99,102,241,0.2); }
-.light .p2,.light .p5,.light .p8 { background:rgba(244,114,182,0.15); }
-.light .p4,.light .p6 { background:rgba(99,102,241,0.15); }
+              <div className="grid grid-cols-3 gap-4">
+                {[{ l: 'كورس', v: enrolledCourses.length, i: <FiUnlock />, c: 'var(--primary)' },
+                  { l: 'فيديو', v: stats.videos, i: <FiPlay />, c: 'var(--accent)' },
+                  { l: 'اختبار', v: stats.exams, i: <FiAward />, c: 'var(--accent2)' }
+                ].map((s, idx) => (
+                  <div key={idx} className="glass-card p-6 text-center border-b-4" style={{ borderColor: s.c }}>
+                    <div className="text-2xl font-black mb-1">{s.v}</div>
+                    <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] font-bold">{s.l}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-/* ===== Responsive ===== */
-@media (max-width: 640px) {
-  h1 { font-size: clamp(1.75rem, 8vw, 3rem) !important; }
-  h2 { font-size: clamp(1.25rem, 6vw, 2rem) !important; }
-}
+            <div className="space-y-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              <div className="glass-card p-6 text-center border-2 border-dashed border-indigo-500/20">
+                <p className="text-[10px] text-[var(--text-faint)] font-bold mb-2 tracking-[0.2em]">STUDENT CODE</p>
+                <div className="text-3xl font-black font-mono text-indigo-500">{student?.student_code}</div>
+              </div>
+              
+              <div className="glass-card p-6">
+                <h3 className="font-bold mb-4 flex items-center gap-2"><FiClock className="text-indigo-500"/> آخر التحديثات</h3>
+                <div className="space-y-4">
+                  {exams.slice(0, 3).map(ex => (
+                    <div key={ex.id} className="flex items-center justify-between text-sm p-3 rounded-xl bg-[var(--surface)]">
+                      <span className="font-medium line-clamp-1">{ex.title}</span>
+                      {getExamAttempt(ex.id) ? <FiCheck className="text-green-500"/> : <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-/* ===== Selection ===== */
-::selection { background: rgba(99,102,241,0.3); color: var(--text); }
+        {/* --- COURSES TAB --- */}
+        {activeTab === 'courses' && (
+          <div className="space-y-12 animate-fade-in">
+            <section>
+              <h2 className="text-2xl font-black mb-6 flex items-center gap-3">
+                <span className="w-2 h-8 gradient-primary rounded-full" /> كورساتك النشطة
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {enrolledCourses.map(course => (
+                  <a key={course.id} href={`/student/course/${course.id}`} className="glass-card overflow-hidden group">
+                    <div className="aspect-video bg-[var(--bg3)] relative overflow-hidden">
+                      <img src={course.thumbnail_url || '/placeholder.png'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <FiPlay size={40} className="text-white" />
+                      </div>
+                    </div>
+                    <div className="p-5">
+                      <h3 className="font-bold text-sm mb-3 line-clamp-1">{course.title}</h3>
+                      <div className="flex items-center justify-between text-[10px] font-bold text-indigo-500 uppercase tracking-tighter">
+                        <span>جاهز للمشاهدة</span>
+                        <FiUnlock />
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
 
-/* ===== Light mode overrides ===== */
-.light .text-gray-400 { color: var(--text-muted) !important; }
-.light .text-gray-500 { color: var(--text-muted) !important; }
-.light .text-gray-300 { color: var(--text) !important; }
-.light .bg-white\/5   { background: rgba(0,0,0,0.04) !important; }
-.light .bg-white\/10  { background: rgba(0,0,0,0.07) !important; }
-.light .border-white\/5  { border-color: rgba(0,0,0,0.07) !important; }
-.light .border-white\/10 { border-color: rgba(0,0,0,0.10) !important; }
-.light .gradient-dark { background: var(--bg) !important; }
-.light .gradient-card { background: var(--bg2) !important; }
-.light .glass-card:hover { background: rgba(0,0,0,0.04); }
+        {/* --- EXAMS TAB --- */}
+        {activeTab === 'exams' && (
+          <div className="max-w-3xl mx-auto space-y-4 animate-fade-in">
+            {exams.map(ex => {
+              const att = getExamAttempt(ex.id);
+              return (
+                <div key={ex.id} className="glass-card p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${att ? 'bg-green-500/10 text-green-500' : 'bg-indigo-500/10 text-indigo-500'}`}>
+                      <FiFileText />
+                    </div>
+                    <div>
+                      <h3 className="font-bold">{ex.title}</h3>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">{ex.duration_minutes} دقيقة • {ex.pass_score}% للنجاح</p>
+                    </div>
+                  </div>
+                  {att ? (
+                    <div className="text-center bg-[var(--surface)] px-4 py-2 rounded-2xl">
+                      <div className="text-xl font-black">{att.percentage}%</div>
+                      <span className="text-[8px] font-bold uppercase text-[var(--text-faint)]">النتيجة</span>
+                    </div>
+                  ) : (
+                    <a href={`/student/exam/${ex.id}`} className="gradient-primary text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg hover:shadow-indigo-500/40 transition-shadow">بدء</a>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
-/* ===== Toast ===== */
-.go2072408551 {
-  font-family: 'Tajawal', sans-serif !important;
-  direction: rtl !important;
-  background: var(--bg2) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
-}
+        {/* --- PRODUCTS TAB --- */}
+        {activeTab === 'products' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            {products.map(product => {
+              const order = getOrder(product.id);
+              return (
+                <div key={product.id} className="glass-card p-6 flex flex-col justify-between">
+                  <div>
+                    <div className="w-full h-40 bg-[var(--bg3)] rounded-2xl mb-4 flex items-center justify-center text-5xl">
+                      {product.type === 'book' ? '📚' : '🎁'}
+                    </div>
+                    <h3 className="font-bold text-lg">{product.title}</h3>
+                    <p className="text-indigo-500 font-black text-xl my-2">{product.price} ج.م</p>
+                  </div>
+                  
+                  <div className="mt-4">
+                    {order ? (
+                      <div className="w-full py-3 text-center rounded-xl font-bold text-xs bg-[var(--surface)] text-indigo-500">
+                        {statusLabel[order.status]}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <input 
+                          type="text" 
+                          placeholder="عنوان التوصيل أو ملاحظات..." 
+                          className="w-full text-xs"
+                          onChange={e => setNotes(prev => ({ ...prev, [product.id]: e.target.value }))}
+                        />
+                        <button 
+                          onClick={() => handleOrder(product.id)}
+                          disabled={ordering === product.id}
+                          className="w-full gradient-primary text-white py-3 rounded-xl text-xs font-bold shadow-lg"
+                        >
+                          {ordering === product.id ? 'جاري الطلب...' : 'اطلب الآن'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
 
-/* ===== Smooth transitions ===== */
-*, *::before, *::after {
-  transition-property: background-color, border-color, color;
-  transition-duration: 0.25s;
-  transition-timing-function: ease;
-}
-.animate-fade-in, .animate-float, .animate-glow, .card-hover, .glass-card, button, a {
-  transition: all 0.25s ease;
+      {/* ===== Mobile Bottom Nav (Glass) ===== */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden p-4 bg-gradient-to-t from-[var(--bg)] to-transparent">
+        <div className="glass h-16 rounded-3xl flex justify-around items-center px-2">
+          {tabs.map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`flex flex-col items-center gap-1 transition-all ${activeTab === tab.key ? 'text-indigo-500 scale-110' : 'text-[var(--text-faint)]'}`}>
+              <span className="text-xl">{tab.icon}</span>
+              <span className="text-[9px] font-bold uppercase">{tab.label.split(' ')[0]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
