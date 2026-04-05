@@ -9,7 +9,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ar" dir="rtl">
-      <body>
+      <body className="antialiased">
         <ToasterProvider />
         {children}
       </body>
