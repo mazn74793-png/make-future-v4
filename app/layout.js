@@ -10,7 +10,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
-        {/* السكريبت ده وظيفته يخلي الثيم يشتغل فوراً قبل تحميل الصفحة */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -29,10 +28,10 @@ export default function RootLayout({ children }) {
             `,
           }}
         />
-       head>
+      </head>
       <body className="min-h-screen bg-[#09090b] text-white selection:bg-purple-500/30">
         
-        {/* طبقات الخلفية الثابتة (Aurora) - هتظهر في كل صفحات الموقع */}
+        {/* طبقات الخلفية الثابتة (Aurora) */}
         <div className="site-bg" aria-hidden="true">
           <div className="aurora-orb aurora-orb-1" />
           <div className="aurora-orb aurora-orb-2" />
@@ -51,7 +50,6 @@ export default function RootLayout({ children }) {
           {children}
         </main>
 
-        {/* نظام التنبيهات */}
         <Toaster 
           position="top-center"
           toastOptions={{
