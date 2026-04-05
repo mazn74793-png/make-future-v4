@@ -1,48 +1,41 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+import './globals.css';
+import { Toaster } from 'react-hot-toast';
 
-:root {
-  --bg: #ffffff;
-  --surface: #f4f4f5;
-  --text: #09090b;
-  --primary: #6366f1;
-}
+export const metadata = {
+  title: 'منصتي التعليمية',
+  description: 'منصة الطالب الذكية',
+};
 
-.dark {
-  --bg: #09090b;
-  --surface: #121214;
-  --text: #ffffff;
-  --primary: #818cf8;
-}
+export default function RootLayout({ children }) {
+  return (
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const savedTheme = localStorage.getItem('theme') || 'dark';
+                  document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+                  document.documentElement.classList.toggle('light', savedTheme === 'light');
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-indigo-500/30">
+        <div className="site-bg" aria-hidden="true">
+          <div className="aurora-orb aurora-orb-1 bg-indigo-500/30" />
+          <div className="aurora-orb aurora-orb-2 bg-purple-500/30" />
+        </div>
 
-body {
-  background-color: var(--bg);
-  color: var(--text);
-  transition: background-color 0.3s ease;
-}
+        <main className="relative z-10">
+          {children}
+        </main>
 
-.site-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.aurora-orb {
-  position: absolute;
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.2;
-  animation: float 20s infinite alternate;
-}
-
-.dark .aurora-orb { opacity: 0.1; }
-
-@keyframes float {
-  from { transform: translate(0, 0); }
-  to { transform: translate(100px, 50px); }
+        <Toaster position="top-center" />
+      </body>
+    </html>
+  );
 }
