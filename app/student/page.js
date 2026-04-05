@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { 
-  FiBookOpen, FiLogOut, FiUnlock, FiPlay, FiFileText, 
-  FiShoppingBag, FiUser, FiSun, FiMoon, FiAward, FiHome // تم إضافة FiHome هنا
+  FiBookOpen, FiLogOut, FiPlay, FiShoppingBag, 
+  FiUser, FiSun, FiMoon, FiAward, FiHome, FiZap, FiStar 
 } from 'react-icons/fi';
 
 export default function StudentPage() {
@@ -16,7 +16,6 @@ export default function StudentPage() {
   const [activeTab, setActiveTab] = useState('home');
   const router = useRouter();
 
-  // إدارة السيم (Theme)
   useEffect(() => {
     const saved = localStorage.getItem('theme') || 'dark';
     setIsDark(saved === 'dark');
@@ -30,26 +29,14 @@ export default function StudentPage() {
     localStorage.setItem('theme', next ? 'dark' : 'light');
   };
 
-  // جلب بيانات الطالب والكورسات
   useEffect(() => {
     const loadData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { 
-          router.push('/login'); 
-          return; 
-        }
+        if (!user) { router.push('/login'); return; }
 
-        const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (studentError || !studentData || studentData.status !== 'approved') { 
-          router.push('/pending'); 
-          return; 
-        }
+        const { data: studentData } = await supabase.from('students').select('*').eq('user_id', user.id).single();
+        if (!studentData || studentData.status !== 'approved') { router.push('/pending'); return; }
         
         setStudent(studentData);
 
@@ -60,8 +47,6 @@ export default function StudentPage() {
 
         setCourses(cData || []);
         setEnrollments(eData?.map(e => e.course_id) || []);
-      } catch (err) {
-        console.error("Error loading data:", err);
       } finally {
         setLoading(false);
       }
@@ -70,126 +55,173 @@ export default function StudentPage() {
   }, [router]);
 
   if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)]">
-      <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-      <p className="animate-pulse font-bold opacity-50">جاري تحميل بياناتك...</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+      <div className="relative w-20 h-20">
+        <div className="absolute inset-0 border-4 border-indigo-500/20 rounded-full"></div>
+        <div className="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
     </div>
   );
 
   const enrolled = courses.filter(c => enrollments.includes(c.id) || c.visibility === 'public');
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300 pb-24" dir="rtl">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-indigo-500/30" dir="rtl">
       
-      {/* Navbar العلوي */}
-      <nav className="fixed top-0 inset-x-0 h-20 glass-card border-b border-[var(--border)] z-50 px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-            <FiUser size={20}/>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-sm leading-tight">{student?.name}</span>
-            <span className="text-[10px] opacity-50">{student?.stage}</span>
-          </div>
+      {/* خلفية جمالية ثابتة */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/10 blur-[120px] rounded-full"></div>
+        <div className="absolute top-[20%] -right-[10%] w-[30%] h-[30%] bg-purple-500/10 blur-[120px] rounded-full"></div>
+      </div>
+
+      {/* Sidebar - Desktop */}
+      <aside className="fixed right-0 top-0 bottom-0 w-24 hidden lg:flex flex-col items-center py-8 gap-8 border-l border-[var(--border)] glass-card z-50">
+        <div className="w-12 h-12 gradient-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/40">
+          <FiZap size={24} />
         </div>
-        
-        <div className="flex items-center gap-2">
-          <button onClick={toggleTheme} className="p-3 glass-card rounded-xl hover:scale-110 transition-all border border-[var(--border)]">
+        <nav className="flex flex-col gap-4 mt-10">
+          <SidebarBtn icon={<FiHome/>} active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+          <SidebarBtn icon={<FiBookOpen/>} active={activeTab === 'courses'} onClick={() => setActiveTab('courses')} />
+          <SidebarBtn icon={<FiShoppingBag/>} active={activeTab === 'products'} onClick={() => setActiveTab('products')} />
+        </nav>
+        <div className="mt-auto flex flex-col gap-4">
+          <button onClick={toggleTheme} className="p-3 rounded-xl hover:bg-indigo-500/10 transition-all">
             {isDark ? <FiSun className="text-amber-400" /> : <FiMoon className="text-indigo-500" />}
           </button>
-          <button 
-            onClick={() => {
-              supabase.auth.signOut();
-              router.push('/login');
-            }} 
-            className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
-          >
-            <FiLogOut/>
-          </button>
+          <button onClick={() => supabase.auth.signOut()} className="p-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"><FiLogOut/></button>
         </div>
-      </nav>
+      </aside>
 
       {/* المحتوى الرئيسي */}
-      <main className="max-w-7xl mx-auto px-6 pt-28">
+      <main className="lg:mr-24 p-4 md:p-10 transition-all duration-500">
         
-        {activeTab === 'home' && (
-          <div className="animate-fade-in">
-            <div className="glass-card p-8 md:p-12 rounded-[2.5rem] border border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 relative overflow-hidden mb-8">
-              <div className="relative z-10">
-                <h1 className="text-3xl md:text-5xl font-black mb-4">
-                  أهلاً بك، {student?.name?.split(' ')[0]}! 👋
-                </h1>
-                <p className="opacity-70 text-lg mb-8 max-w-md">
-                  لديك الآن <span className="text-indigo-500 font-bold">{enrolled.length} كورس</span> متاح في مكتبتك الخاصة. جاهز للتعلم؟
-                </p>
-                <button 
-                  onClick={() => setActiveTab('courses')} 
-                  className="gradient-primary text-white px-8 py-4 rounded-2xl font-bold shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
-                >
-                  استكمال التعلم الآن
-                </button>
-              </div>
-              <FiAward className="absolute -bottom-10 -right-10 opacity-[0.03] dark:opacity-[0.05] text-indigo-500" size={300} />
-            </div>
-
-            {/* قسم سريع للكورسات الأخيرة */}
-            <h2 className="text-xl font-black mb-6 flex items-center gap-2">
-              <span className="w-2 h-6 gradient-primary rounded-full" />
-              أحدث الكورسات المتاحة
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               {enrolled.slice(0, 3).map(course => (
-                 <div key={course.id} className="glass-card rounded-3xl p-4 border border-[var(--border)] group hover:border-indigo-500/50 transition-all">
-                    <div className="aspect-video rounded-2xl bg-gray-500/10 mb-4 overflow-hidden relative">
-                       {course.thumbnail ? <img src={course.thumbnail} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center opacity-20"><FiPlay size={40}/></div>}
-                    </div>
-                    <h3 className="font-bold mb-2 group-hover:text-indigo-500 transition-colors">{course.title}</h3>
-                    <button className="w-full py-2 bg-indigo-500/10 text-indigo-500 rounded-xl font-bold text-sm group-hover:bg-indigo-500 group-hover:text-white transition-all">عرض المحتوى</button>
-                 </div>
-               ))}
-            </div>
+        {/* Header الجوال */}
+        <header className="flex lg:hidden items-center justify-between mb-8 glass-card p-4 rounded-2xl border border-[var(--border)]">
+          <div className="flex items-center gap-3">
+             <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center text-white"><FiUser/></div>
+             <span className="font-bold text-sm">{student?.name?.split(' ')[0]}</span>
           </div>
-        )}
+          <button onClick={toggleTheme} className="p-2 glass-card rounded-lg border border-[var(--border)]">
+            {isDark ? <FiSun size={18}/> : <FiMoon size={18}/>}
+          </button>
+        </header>
 
-        {activeTab === 'courses' && (
-          <div className="animate-fade-in text-center py-20">
-            <FiBookOpen size={50} className="mx-auto mb-4 opacity-20" />
-            <h2 className="text-2xl font-bold">مكتبة الكورسات</h2>
-            <p className="opacity-50">قريباً سيتم عرض جميع الكورسات هنا</p>
+        {activeTab === 'home' && (
+          <div className="max-w-6xl mx-auto space-y-10">
+            
+            {/* Hero Section - نيو مودرن */}
+            <section className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[2.5rem] blur opacity-25 group-hover:opacity-40 transition duration-1000"></div>
+              <div className="relative glass-card rounded-[2.5rem] p-8 md:p-16 border border-white/10 overflow-hidden">
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
+                  <div className="text-center md:text-right">
+                    <span className="inline-block px-4 py-1 rounded-full bg-indigo-500/10 text-indigo-500 text-xs font-black mb-4 tracking-widest uppercase">منصة التعلم الذكية</span>
+                    <h1 className="text-4xl md:text-6xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-l from-[var(--foreground)] to-gray-400">
+                      أهلاً بك، {student?.name?.split(' ')[0]}
+                    </h1>
+                    <p className="text-lg opacity-60 mb-8 max-w-md leading-relaxed">باقي لك <span className="text-indigo-500 font-bold">3 دروس</span> عشان تخلص كورس "الفيزياء الحديثة". كمل شغفك!</p>
+                    <div className="flex flex-wrap justify-center md:justify-start gap-4">
+                      <button onClick={() => setActiveTab('courses')} className="px-8 py-4 gradient-primary text-white rounded-2xl font-bold shadow-2xl shadow-indigo-500/30 hover:scale-105 active:scale-95 transition-all">ابدأ المذاكرة</button>
+                      <button className="px-8 py-4 glass-card border border-[var(--border)] rounded-2xl font-bold hover:bg-white/5 transition-all">جدول الحصص</button>
+                    </div>
+                  </div>
+                  <div className="hidden md:block relative">
+                     <div className="w-64 h-64 rounded-full gradient-primary animate-pulse blur-3xl opacity-20 absolute top-0"></div>
+                     <FiAward className="text-indigo-500 relative z-10 drop-shadow-2xl" size={200} />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Quick Stats */}
+            <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+               <StatCard label="درجة الاختبار" value="98%" icon={<FiStar className="text-amber-400"/>} />
+               <StatCard label="الكورسات" value={enrolled.length} icon={<FiBookOpen className="text-indigo-400"/>} />
+               <StatCard label="النقاط" value="1,250" icon={<FiZap className="text-purple-400"/>} />
+               <StatCard label="المستوى" value="A1" icon={<FiAward className="text-emerald-400"/>} />
+            </section>
+
+            {/* Courses Preview */}
+            <section>
+              <div className="flex items-center justify-between mb-8 px-2">
+                 <h2 className="text-2xl font-black">كورساتك النشطة</h2>
+                 <button onClick={() => setActiveTab('courses')} className="text-indigo-500 font-bold text-sm hover:underline">عرض الكل</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                 {enrolled.map(course => (
+                   <div key={course.id} className="group glass-card rounded-[2rem] border border-[var(--border)] overflow-hidden hover:border-indigo-500/40 transition-all duration-500">
+                      <div className="aspect-[16/10] bg-gray-500/5 relative overflow-hidden">
+                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center">
+                            <FiPlay className="text-white scale-50 group-hover:scale-100 transition-transform duration-500" size={40} />
+                         </div>
+                         {course.thumbnail ? <img src={course.thumbnail} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" /> : <div className="w-full h-full flex items-center justify-center opacity-10"><FiBookOpen size={50}/></div>}
+                      </div>
+                      <div className="p-6">
+                         <h3 className="font-bold text-lg mb-4 truncate">{course.title}</h3>
+                         <div className="w-full bg-gray-500/10 h-1.5 rounded-full overflow-hidden mb-4">
+                            <div className="bg-indigo-500 h-full w-[65%] rounded-full"></div>
+                         </div>
+                         <div className="flex items-center justify-between text-xs opacity-50">
+                            <span>تم إنجاز 65%</span>
+                            <span>12 درس باقي</span>
+                         </div>
+                      </div>
+                   </div>
+                 ))}
+              </div>
+            </section>
+
           </div>
         )}
 
       </main>
 
-      {/* القائمة السفلية للموبايل (Mobile Nav) */}
-      <div className="fixed bottom-6 inset-x-6 md:hidden z-50">
-        <div className="glass-card h-18 rounded-[2rem] border border-[var(--border)] flex justify-around items-center px-4 shadow-2xl backdrop-blur-xl">
-          <button 
-            onClick={() => setActiveTab('home')} 
-            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'home' ? 'text-indigo-500 scale-110' : 'opacity-40 hover:opacity-100'}`}
-          >
-            <FiHome size={22}/>
-            <span className="text-[10px] font-bold">الرئيسية</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('courses')} 
-            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'courses' ? 'text-indigo-500 scale-110' : 'opacity-40 hover:opacity-100'}`}
-          >
-            <FiBookOpen size={22}/>
-            <span className="text-[10px] font-bold">كورساتي</span>
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('products')} 
-            className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'products' ? 'text-indigo-500 scale-110' : 'opacity-40 hover:opacity-100'}`}
-          >
-            <FiShoppingBag size={22}/>
-            <span className="text-[10px] font-bold">المتجر</span>
-          </button>
+      {/* Mobile Nav - نيو مودرن */}
+      <div className="fixed bottom-0 inset-x-0 p-4 lg:hidden z-[100]">
+        <div className="glass-card h-18 rounded-3xl border border-white/10 flex justify-around items-center px-4 shadow-2xl shadow-black/50 backdrop-blur-2xl">
+          <MobileTab active={activeTab === 'home'} icon={<FiHome size={22}/>} onClick={() => setActiveTab('home')} />
+          <MobileTab active={activeTab === 'courses'} icon={<FiBookOpen size={22}/>} onClick={() => setActiveTab('courses')} />
+          <MobileTab active={activeTab === 'products'} icon={<FiShoppingBag size={22}/>} onClick={() => setActiveTab('products')} />
+          <button onClick={() => supabase.auth.signOut()} className="p-3 text-red-500/50"><FiLogOut size={22}/></button>
         </div>
       </div>
+    </div>
+  );
+}
 
+// مكونات صغيرة (Components) لتقليل تكرار الكود وزيادة النظافة
+function SidebarBtn({ icon, active, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 ${active ? 'gradient-primary text-white shadow-lg shadow-indigo-500/30' : 'text-gray-500 hover:bg-indigo-500/10 hover:text-indigo-500'}`}
+    >
+      {icon}
+    </button>
+  );
+}
+
+function MobileTab({ active, icon, onClick }) {
+  return (
+    <button onClick={onClick} className={`relative p-3 transition-all ${active ? 'text-indigo-500' : 'opacity-40'}`}>
+      {icon}
+      {active && <span className="absolute -top-1 right-1/2 translate-x-1/2 w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_10px_#6366f1]"></span>}
+    </button>
+  );
+}
+
+function StatCard({ label, value, icon }) {
+  return (
+    <div className="glass-card p-5 rounded-3xl border border-[var(--border)] hover:border-indigo-500/20 transition-all group">
+       <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gray-500/5 flex items-center justify-center group-hover:scale-110 transition-transform italic">
+             {icon}
+          </div>
+          <div>
+             <p className="text-[10px] opacity-50 font-bold uppercase tracking-tighter">{label}</p>
+             <p className="text-lg font-black">{value}</p>
+          </div>
+       </div>
     </div>
   );
 }
