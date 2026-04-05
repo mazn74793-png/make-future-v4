@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   FiHome, FiUsers, FiCalendar, FiBookOpen, 
   FiVideo, FiUploadCloud, FiEdit3, FiPackage, 
-  FiMessageCircle, Fi megaphone, FiStar, FiImage, 
+  FiMessageCircle, FiMegaphone, FiStar, FiImage, // تم تصحيح Fi megaphone هنا
   FiSettings, FiLogOut, FiArrowLeft, FiMenu, FiX 
 } from 'react-icons/fi';
 
