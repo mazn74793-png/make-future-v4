@@ -2,31 +2,48 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import { FiSave } from 'react-icons/fi';
+import { FiSave, FiSettings, FiUser, FiLayout, FiBarChart2, FiMessageCircle, FiMonitor } from 'react-icons/fi';
 
-// ⚠️ مهم جداً — معرّفين برا الـ component عشان متتعملش re-render
-const Section = ({ title, children }) => (
-  <div className="glass rounded-2xl p-6 mb-6 animate-fade-in">
-    <h2 className="text-xl font-bold mb-4 text-purple-400">{title}</h2>
-    <div className="space-y-4">{children}</div>
+// مكون القسم مع أيقونة اختيارية
+const Section = ({ title, icon, children }) => (
+  <div className="glass rounded-3xl p-6 mb-8 animate-fade-in border border-white/5 hover:border-white/10 transition-all shadow-xl">
+    <div className="flex items-center gap-3 mb-6">
+      <div className="p-2 bg-purple-500/10 rounded-lg text-purple-400">
+        {icon}
+      </div>
+      <h2 className="text-xl font-black">{title}</h2>
+    </div>
+    <div className="space-y-5">{children}</div>
   </div>
 );
 
 const Field = ({ label, value, onChange, type = 'text', placeholder = '' }) => (
-  <div>
-    <label className="text-sm text-gray-400 mb-1 block">{label}</label>
-    <input type={type} value={value || ''} onChange={e => onChange(e.target.value)}
+  <div className="group">
+    <label className="text-sm font-bold text-gray-500 mb-2 block group-focus-within:text-purple-400 transition-colors">
+      {label}
+    </label>
+    <input 
+      type={type} 
+      value={value || ''} 
+      onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white placeholder:text-gray-600 focus:border-purple-500 focus:outline-none transition" />
+      className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 px-5 text-white placeholder:text-gray-600 focus:border-purple-500/50 focus:ring-4 focus:ring-purple-500/10 focus:outline-none transition-all" 
+    />
   </div>
 );
 
 const TextareaField = ({ label, value, onChange, placeholder = '' }) => (
-  <div>
-    <label className="text-sm text-gray-400 mb-1 block">{label}</label>
-    <textarea value={value || ''} onChange={e => onChange(e.target.value)}
-      placeholder={placeholder} rows={3}
-      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white placeholder:text-gray-600 focus:border-purple-500 focus:outline-none transition resize-none" />
+  <div className="group">
+    <label className="text-sm font-bold text-gray-500 mb-2 block group-focus-within:text-purple-400 transition-colors">
+      {label}
+    </label>
+    <textarea 
+      value={value || ''} 
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder} 
+      rows={3}
+      className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 px-5 text-white placeholder:text-gray-600 focus:border-purple-500/50 focus:ring-4 focus:ring-purple-500/10 focus:outline-none transition-all resize-none" 
+    />
   </div>
 );
 
@@ -35,8 +52,15 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase.from('site_settings').select('*').single()
-      .then(({ data }) => { if (data) setSettings(data); });
+    async function fetchSettings() {
+      const { data, error } = await supabase.from('site_settings').select('*').single();
+      if (error) {
+        toast.error('فشل تحميل الإعدادات');
+        return;
+      }
+      if (data) setSettings(data);
+    }
+    fetchSettings();
   }, []);
 
   const update = useCallback((key, value) => {
@@ -45,103 +69,120 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.from('site_settings').update(settings).eq('id', 1);
-    if (error) toast.error('حصل مشكلة');
-    else toast.success('تم الحفظ بنجاح ✅');
-    setSaving(false);
+    try {
+      const { error } = await supabase.from('site_settings').update(settings).eq('id', 1);
+      if (error) throw error;
+      toast.success('تم حفظ جميع التغييرات بنجاح ✅', {
+        style: { borderRadius: '15px', background: '#18181b', color: '#fff' }
+      });
+    } catch (error) {
+      toast.error('حدث خطأ أثناء الحفظ');
+      console.error(error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!settings) return (
-    <div className="text-center py-20">
-      <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
+    <div className="flex flex-col items-center justify-center py-40 gap-4">
+      <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+      <p className="text-gray-500 font-bold animate-pulse">جاري تحميل الإعدادات...</p>
     </div>
   );
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-black">اعدادات الموقع</h1>
-        <button onClick={handleSave} disabled={saving}
-          className="gradient-primary px-6 py-3 rounded-xl text-white font-bold hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2">
-          <FiSave /> {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+    <div className="max-w-4xl mx-auto px-4 pb-20 pt-4" dir="rtl">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-12">
+        <div>
+          <h1 className="text-4xl font-black tracking-tight">إعدادات المنصة</h1>
+          <p className="text-gray-500 mt-1">تحكم في كل تفاصيل موقعك من مكان واحد</p>
+        </div>
+        <button 
+          onClick={handleSave} 
+          disabled={saving}
+          className="gradient-primary px-8 py-4 rounded-2xl text-white font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20"
+        >
+          {saving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FiSave size={20} />}
+          {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
         </button>
       </div>
 
-      <Section title="معلومات الموقع">
-        <Field label="اسم المنصة" value={settings.site_name} onChange={v => update('site_name', v)} placeholder="منصة الأستاذ" />
-        <TextareaField label="وصف الموقع" value={settings.site_description} onChange={v => update('site_description', v)} placeholder="منصة تعليمية احترافية" />
-        <Field label="رابط اللوجو" value={settings.logo_url} onChange={v => update('logo_url', v)} placeholder="https://..." />
-        <Field label="نص الفوتر" value={settings.footer_text} onChange={v => update('footer_text', v)} placeholder="جميع الحقوق محفوظة" />
-      </Section>
+      <div className="grid grid-cols-1 gap-2">
+        
+        <Section title="هوية الموقع" icon={<FiSettings />}>
+          <Field label="اسم المنصة" value={settings.site_name} onChange={v => update('site_name', v)} placeholder="مثلاً: منصة المستقبل" />
+          <TextareaField label="وصف الموقع (SEO)" value={settings.site_description} onChange={v => update('site_description', v)} />
+          <Field label="رابط اللوجو" value={settings.logo_url} onChange={v => update('logo_url', v)} placeholder="https://..." />
+          <Field label="نص الحقوق (Footer)" value={settings.footer_text} onChange={v => update('footer_text', v)} />
+        </Section>
 
-      <Section title="بيانات المدرس">
-        <Field label="اسم المدرس" value={settings.teacher_name} onChange={v => update('teacher_name', v)} placeholder="أ/ محمد" />
-        <Field label="المادة" value={settings.subject} onChange={v => update('subject', v)} placeholder="رياضيات" />
-        <Field label="المرحلة" value={settings.stage} onChange={v => update('stage', v)} placeholder="ثانوية عامة" />
-        <TextareaField label="نبذة عن المدرس" value={settings.about_text} onChange={v => update('about_text', v)} placeholder="اكتب نبذة..." />
-        <Field label="صورة المدرس (رابط)" value={settings.teacher_image_url} onChange={v => update('teacher_image_url', v)} placeholder="https://..." />
-        <TextareaField label="السيرة الذاتية" value={settings.teacher_bio} onChange={v => update('teacher_bio', v)} />
-      </Section>
+        <Section title="بيانات المدرس" icon={<FiUser />}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="اسم المدرس" value={settings.teacher_name} onChange={v => update('teacher_name', v)} />
+            <Field label="المادة العلمية" value={settings.subject} onChange={v => update('subject', v)} />
+          </div>
+          <Field label="صورة المدرس (رابط URL)" value={settings.teacher_image_url} onChange={v => update('teacher_image_url', v)} />
+          <TextareaField label="نبذة قصيرة" value={settings.about_text} onChange={v => update('about_text', v)} />
+          <TextareaField label="السيرة الذاتية المفصلة" value={settings.teacher_bio} onChange={v => update('teacher_bio', v)} />
+        </Section>
 
-      <Section title="الصفحة الرئيسية">
-        <Field label="العنوان الرئيسي" value={settings.hero_title} onChange={v => update('hero_title', v)} placeholder="تعلم بطريقة مختلفة" />
-        <TextareaField label="الوصف تحت العنوان" value={settings.hero_subtitle} onChange={v => update('hero_subtitle', v)} />
-      </Section>
+        <Section title="واجهة الصفحة الرئيسية" icon={<FiLayout />}>
+          <Field label="العنوان الجذاب (Hero Title)" value={settings.hero_title} onChange={v => update('hero_title', v)} />
+          <TextareaField label="الوصف التوضيحي" value={settings.hero_subtitle} onChange={v => update('hero_subtitle', v)} />
+        </Section>
 
-      <Section title="الاحصائيات">
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="عدد الطلاب" value={settings.stats_students} onChange={v => update('stats_students', v)} placeholder="+500" />
-          <Field label="عدد الفيديوهات" value={settings.stats_videos} onChange={v => update('stats_videos', v)} placeholder="+50" />
-          <Field label="عدد الكورسات" value={settings.stats_courses} onChange={v => update('stats_courses', v)} placeholder="+10" />
-          <Field label="التقييم" value={settings.stats_rating} onChange={v => update('stats_rating', v)} placeholder="4.9" />
-        </div>
-      </Section>
+        <Section title="الإحصائيات والأرقام" icon={<FiBarChart2 />}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Field label="الطلاب" value={settings.stats_students} onChange={v => update('stats_students', v)} />
+            <Field label="الفيديوهات" value={settings.stats_videos} onChange={v => update('stats_videos', v)} />
+            <Field label="الكورسات" value={settings.stats_courses} onChange={v => update('stats_courses', v)} />
+            <Field label="التقييم" value={settings.stats_rating} onChange={v => update('stats_rating', v)} />
+          </div>
+        </Section>
 
-      <Section title="التواصل والسوشيال ميديا">
-        <Field label="رقم الواتساب (بالكود الدولي)" value={settings.whatsapp_number} onChange={v => update('whatsapp_number', v)} placeholder="201xxxxxxxxx" />
-        <Field label="ايميل التواصل" value={settings.contact_email} onChange={v => update('contact_email', v)} placeholder="email@example.com" />
-        <Field label="رابط Facebook" value={settings.facebook_url} onChange={v => update('facebook_url', v)} placeholder="https://facebook.com/..." />
-        <Field label="رابط YouTube" value={settings.youtube_url} onChange={v => update('youtube_url', v)} placeholder="https://youtube.com/..." />
-        <Field label="رابط Telegram" value={settings.telegram_url} onChange={v => update('telegram_url', v)} placeholder="https://t.me/..." />
-      </Section>
+        <Section title="روابط التواصل" icon={<FiMessageCircle />}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="واتساب (مثال: 201000000000)" value={settings.whatsapp_number} onChange={v => update('whatsapp_number', v)} />
+            <Field label="البريد الإلكتروني" value={settings.contact_email} onChange={v => update('contact_email', v)} />
+          </div>
+          <div className="space-y-4">
+            <Field label="فيسبوك" value={settings.facebook_url} onChange={v => update('facebook_url', v)} />
+            <Field label="يوتيوب" value={settings.youtube_url} onChange={v => update('youtube_url', v)} />
+            <Field label="تليجرام" value={settings.telegram_url} onChange={v => update('telegram_url', v)} />
+          </div>
+        </Section>
 
-      <Section title="الألوان">
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: 'اللون الرئيسي', field: 'primary_color', default: '#6C5CE7' },
-            { label: 'اللون الثانوي', field: 'secondary_color', default: '#A29BFE' },
-            { label: 'لون مميز', field: 'accent_color', default: '#FD79A8' },
-          ].map(({ label, field, default: def }) => (
-            <div key={field}>
-              <label className="text-sm text-gray-400 mb-1 block">{label}</label>
-              <div className="flex items-center gap-2">
-                <input type="color" value={settings[field] || def}
-                  onChange={e => update(field, e.target.value)}
-                  className="w-10 h-10 rounded cursor-pointer" />
-                <span className="text-gray-400 text-sm">{settings[field]}</span>
-              </div>
+        <Section title="وضع الصيانة" icon={<FiMonitor />}>
+          <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+            <div>
+              <p className="font-bold">تفعيل وضع الصيانة</p>
+              <p className="text-xs text-gray-500">عند التفعيل، سيتم قفل الموقع عن الطلاب وعرض رسالة تنبيه</p>
             </div>
-          ))}
-        </div>
-      </Section>
+            <button 
+              onClick={() => update('is_maintenance', !settings.is_maintenance)}
+              className={`w-14 h-8 rounded-full relative transition-all duration-300 ${settings.is_maintenance ? 'bg-red-500 shadow-lg shadow-red-500/20' : 'bg-white/10'}`}
+            >
+              <div className={`w-6 h-6 bg-white rounded-full absolute top-1 transition-all duration-300 ${settings.is_maintenance ? 'left-1' : 'left-7'}`} />
+            </button>
+          </div>
+          {settings.is_maintenance && (
+            <div className="mt-4 animate-scale-in">
+              <Field label="رسالة التنبيه للطلاب" value={settings.maintenance_message} onChange={v => update('maintenance_message', v)} />
+            </div>
+          )}
+        </Section>
 
-      <Section title="اعدادات متقدمة">
-        <div className="flex items-center justify-between">
-          <span className="text-gray-300">وضع الصيانة (يقفل الموقع)</span>
-          <button onClick={() => update('is_maintenance', !settings.is_maintenance)}
-            className={`w-14 h-7 rounded-full transition ${settings.is_maintenance ? 'bg-purple-500' : 'bg-white/10'}`}>
-            <div className={`w-5 h-5 bg-white rounded-full transition-transform ${settings.is_maintenance ? '-translate-x-7' : '-translate-x-1'}`} />
-          </button>
-        </div>
-        {settings.is_maintenance && (
-          <Field label="رسالة الصيانة" value={settings.maintenance_message} onChange={v => update('maintenance_message', v)} placeholder="الموقع تحت الصيانة" />
-        )}
-      </Section>
+      </div>
 
-      <div className="text-center mt-8 mb-10">
-        <button onClick={handleSave} disabled={saving}
-          className="gradient-primary px-10 py-4 rounded-xl text-white font-bold text-lg hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2 mx-auto">
-          <FiSave /> {saving ? 'جاري الحفظ...' : 'حفظ كل التغييرات'}
+      {/* Floating Save Button Mobile */}
+      <div className="fixed bottom-6 left-6 right-6 md:hidden z-50">
+        <button 
+          onClick={handleSave} 
+          disabled={saving}
+          className="w-full gradient-primary py-4 rounded-2xl text-white font-bold shadow-2xl flex items-center justify-center gap-2"
+        >
+          {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
         </button>
       </div>
     </div>
