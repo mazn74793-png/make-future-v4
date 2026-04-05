@@ -2,7 +2,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
-import { FiPlus, FiTrash2, FiUserCheck, FiUserX, FiKey, FiSearch, FiFilter, FiMail, FiPhone, FiBook } from 'react-icons/fi';
+import { 
+  FiPlus, FiTrash2, FiUserCheck, FiUserX, FiKey, 
+  FiSearch, FiFilter, FiMail, FiPhone, FiBook, 
+  FiDownload, FiExternalLink, FiShield, FiAlertCircle 
+} from 'react-icons/fi';
 
 const STAGES = ['الصف الأول الإعدادي','الصف الثاني الإعدادي','الصف الثالث الإعدادي','الصف الأول الثانوي','الصف الثاني الثانوي','الصف الثالث الثانوي'];
 
@@ -13,9 +17,9 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all, active, blocked
   
   const [showForm, setShowForm] = useState(false);
-  const [approvingAll, setApprovingAll] = useState(false);
   const [changingPassword, setChangingPassword] = useState(null);
   const [newPassword, setNewPassword] = useState('');
   const [form, setForm] = useState({ name:'', email:'', phone:'', parent_phone:'', stage:'', school:'' });
@@ -46,10 +50,21 @@ export default function StudentsPage() {
 
   const handleAdd = async () => {
     if (!form.name || !form.email) return toast.error('الاسم والايميل مطلوبين');
-    const { error } = await supabase.from('students').insert({ ...form, status:'approved', profile_complete:true });
+    
+    // توليد كود طالب تلقائي بسيط إذا لم يوجد
+    const studentCode = `STU-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const { error } = await supabase.from('students').insert({ 
+      ...form, 
+      student_code: studentCode,
+      status:'approved', 
+      profile_complete:true,
+      is_active: true
+    });
+
     if (error) toast.error(error.message);
     else {
-      toast.success('✅ تمت إضافة الطالب بنجاح');
+      toast.success(`✅ تمت إضافة الطالب بكود: ${studentCode}`);
       setShowForm(false);
       setForm({ name:'', email:'', phone:'', parent_phone:'', stage:'', school:'' });
       loadData();
@@ -61,16 +76,7 @@ export default function StudentsPage() {
     if (error) return toast.error('حدث خطأ');
 
     if (status === 'approved') {
-      const student = pending.find(s => s.id === id);
-      if (student?.parent_phone) {
-        await supabase.from('whatsapp_notifications').insert({
-          student_id: id,
-          type: 'enrollment',
-          phone: student.parent_phone,
-          message: `ولي أمر الطالب ${student.name}، تم قبول نجلكم في المنصة بنجاح ✅. الكود: ${student.student_code || 'سيصلكم قريباً'}`,
-        });
-      }
-      toast.success('✅ تم قبول الطالب');
+      toast.success('✅ تم قبول الطالب بنجاح');
     } else {
       toast.error('❌ تم رفض الطلب');
     }
@@ -78,255 +84,174 @@ export default function StudentsPage() {
   };
 
   const handleAccessRequest = async (id, status) => {
-    await supabase.from('access_requests').update({ status }).eq('id', id);
-    toast.success(status === 'approved' ? '✅ تم تفعيل الكورس للطالب' : '❌ تم الرفض');
-    loadData();
+    const { error } = await supabase.from('access_requests').update({ status }).eq('id', id);
+    if (!error) {
+      toast.success(status === 'approved' ? '🚀 تم تفعيل الكورس' : '❌ تم الرفض');
+      loadData();
+    }
   };
 
-  const handleChangePassword = async (studentId, email) => {
-    if (!newPassword || newPassword.length < 6) return toast.error('الباسورد ضعيف (6+ أحرف)');
-    const res = await fetch('/api/change-password', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ studentId, email, newPassword }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      toast.success('✅ تم تحديث الباسورد');
-      setChangingPassword(null);
-      setNewPassword('');
-    } else toast.error(data.error || 'فشلت العملية');
+  // تصدير للـ Excel (بسيط)
+  const exportData = () => {
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + "الاسم,الايميل,المرحلة,الكود,المدرسة\n"
+      + filteredStudents.map(s => `${s.name},${s.email},${s.stage},${s.student_code},${s.school}`).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `طلاب_المنصة_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
   };
 
-  const toggleActive = async (id, current) => {
-    await supabase.from('students').update({ is_active:!current }).eq('id', id);
-    toast.success(current ? 'تم تعطيل الحساب' : '✅ تم تفعيل الحساب');
-    loadData();
-  };
-
-  const filteredStudents = students.filter(s => 
-    (s.name.toLowerCase().includes(search.toLowerCase()) || (s.student_code && s.student_code.includes(search))) &&
-    (stageFilter === '' || s.stage === stageFilter)
-  );
-
-  if (loading && students.length === 0) return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4" />
-      <p className="text-gray-500 font-bold">جاري جلب قائمة الطلاب...</p>
-    </div>
-  );
+  const filteredStudents = students.filter(s => {
+    const matchSearch = s.name.toLowerCase().includes(search.toLowerCase()) || 
+                       (s.student_code && s.student_code.includes(search));
+    const matchStage = stageFilter === '' || s.stage === stageFilter;
+    const matchStatus = statusFilter === 'all' || 
+                       (statusFilter === 'active' && s.is_active) || 
+                       (statusFilter === 'blocked' && !s.is_active);
+    return matchSearch && matchStage && matchStatus;
+  });
 
   return (
-    <div dir="rtl" className="animate-fade-in pb-20">
+    <div dir="rtl" className="max-w-7xl mx-auto px-4 pb-20 pt-4">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="text-3xl font-black">إدارة الطلاب</h1>
-          <p className="text-gray-500 text-sm">متابعة تسجيلات الطلاب، تفعيل الحسابات، وإدارة الصلاحيات.</p>
+          <h1 className="text-4xl font-black text-white tracking-tight">إدارة <span className="text-purple-500">الطلاب</span></h1>
+          <p className="text-gray-500 font-medium mt-1">لديك حالياً {students.length} طالب مقبول في المنصة</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className={`flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all shadow-lg ${showForm ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'gradient-primary text-white hover:scale-105 shadow-purple-500/20'}`}>
-          {showForm ? 'إلغاء' : <><FiPlus /> إضافة طالب يدوياً</>}
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={exportData} className="p-3.5 bg-white/5 border border-white/10 rounded-2xl text-gray-400 hover:text-white transition-all shadow-xl" title="تصدير بيانات الطلاب">
+            <FiDownload size={20} />
+          </button>
+          <button onClick={() => setShowForm(!showForm)}
+            className={`flex items-center gap-2 px-8 py-3.5 rounded-2xl font-black transition-all shadow-2xl ${showForm ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'gradient-primary text-white hover:scale-105'}`}>
+            {showForm ? 'إلغاء' : <><FiPlus /> إضافة طالب</>}
+          </button>
+        </div>
       </div>
 
-      {/* Add Form */}
-      {showForm && (
-        <div className="glass rounded-3xl p-6 mb-10 border border-purple-500/20 animate-scale-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 mr-2">اسم الطالب</label>
-              <input className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 focus:border-purple-500 focus:outline-none transition-all" 
-                type="text" placeholder="الاسم ثلاثي..." value={form.name} onChange={e => setForm({...form, name:e.target.value})} />
+      {/* Quick Action Badges (طلبات معلقة) */}
+      {(accessRequests.length > 0 || pending.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 animate-slide-down">
+          {/* طلبات الكورسات */}
+          {accessRequests.length > 0 && (
+            <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-[2rem] p-6 relative overflow-hidden group">
+               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><FiShield size={80}/></div>
+               <h2 className="text-indigo-400 font-black mb-4 flex items-center gap-2">🛒 طلبات تفعيل كورسات ({accessRequests.length})</h2>
+               <div className="space-y-3 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
+                 {accessRequests.map(req => (
+                   <div key={req.id} className="bg-black/20 p-3 rounded-xl flex items-center justify-between border border-white/5">
+                      <div className="text-xs">
+                        <p className="font-bold text-white">{req.students?.name}</p>
+                        <p className="text-gray-500 mt-0.5">{req.courses?.title}</p>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => handleAccessRequest(req.id,'approved')} className="p-2 bg-emerald-500/20 text-emerald-500 rounded-lg hover:bg-emerald-500 hover:text-white transition-all"><FiUserCheck size={14}/></button>
+                        <button onClick={() => handleAccessRequest(req.id,'rejected')} className="p-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><FiUserX size={14}/></button>
+                      </div>
+                   </div>
+                 ))}
+               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 mr-2">البريد الإلكتروني</label>
-              <input className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 focus:border-purple-500 focus:outline-none" 
-                type="email" placeholder="example@gmail.com" value={form.email} onChange={e => setForm({...form, email:e.target.value})} />
+          )}
+          {/* طلبات التسجيل */}
+          {pending.length > 0 && (
+            <div className="bg-amber-600/10 border border-amber-500/20 rounded-[2rem] p-6 relative overflow-hidden group">
+               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><FiAlertCircle size={80}/></div>
+               <h2 className="text-amber-500 font-black mb-4 flex items-center gap-2">⏳ طلبات انضمام جديدة ({pending.length})</h2>
+               <div className="space-y-3 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
+                 {pending.map(s => (
+                   <div key={s.id} className="bg-black/20 p-3 rounded-xl flex items-center justify-between border border-white/5">
+                      <div className="text-xs">
+                        <p className="font-bold text-white">{s.name}</p>
+                        <p className="text-gray-500 mt-0.5">{s.stage}</p>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => updateStatus(s.id,'approved')} className="p-2 bg-amber-500 text-black rounded-lg hover:bg-amber-600 transition-all font-black text-[10px]">قـبـول</button>
+                        <button onClick={() => updateStatus(s.id,'rejected')} className="p-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><FiTrash2 size={14}/></button>
+                      </div>
+                   </div>
+                 ))}
+               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 mr-2">السنة الدراسية</label>
-              <select className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 focus:border-purple-500 focus:outline-none" 
-                value={form.stage} onChange={e => setForm({...form, stage:e.target.value})}>
-                <option value="" className="bg-gray-900">اختار الصف</option>
-                {STAGES.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
-              </select>
-            </div>
-            <input className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 focus:border-purple-500 focus:outline-none" 
-              type="tel" placeholder="رقم موبايل الطالب" value={form.phone} onChange={e => setForm({...form, phone:e.target.value})} />
-            <input className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 focus:border-purple-500 focus:outline-none" 
-              type="tel" placeholder="رقم ولي الأمر" value={form.parent_phone} onChange={e => setForm({...form, parent_phone:e.target.value})} />
-            <input className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 focus:border-purple-500 focus:outline-none" 
-              type="text" placeholder="المدرسة" value={form.school} onChange={e => setForm({...form, school:e.target.value})} />
-          </div>
-          <button onClick={handleAdd} className="gradient-primary w-full md:w-auto px-10 py-3 rounded-2xl text-white font-bold shadow-xl shadow-purple-500/20">تأكيد الإضافة</button>
+          )}
         </div>
       )}
 
-      {/* Stats/Quick Actions for Requests */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-        {/* Access Requests */}
-        <div className={`glass rounded-3xl p-6 border transition-all ${accessRequests.length > 0 ? 'border-indigo-500/30' : 'border-white/5 opacity-60'}`}>
-          <h2 className="font-black text-lg mb-4 flex items-center gap-2">
-            <FiKey className="text-indigo-400" /> طلبات وصول الكورسات
-            {accessRequests.length > 0 && <span className="bg-indigo-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">{accessRequests.length}</span>}
-          </h2>
-          <div className="max-h-[300px] overflow-y-auto space-y-3 custom-scrollbar">
-            {accessRequests.map(req => (
-              <div key={req.id} className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-4 flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="font-bold text-sm truncate">{req.students?.name}</p>
-                  <p className="text-[10px] text-indigo-400 font-bold mb-2">كورس: {req.courses?.title}</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => handleAccessRequest(req.id,'approved')} className="bg-emerald-500 text-white text-[10px] px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-600 transition-colors">تفعيل</button>
-                    <button onClick={() => handleAccessRequest(req.id,'rejected')} className="bg-white/5 text-red-400 text-[10px] px-3 py-1.5 rounded-lg font-bold border border-white/5 hover:bg-red-500/10">رفض</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {accessRequests.length === 0 && <p className="text-center py-6 text-xs text-gray-500">لا يوجد طلبات شراء حالياً</p>}
+      {/* Main List & Filters */}
+      <div className="glass rounded-[2.5rem] p-8 border-white/5 shadow-2xl">
+        {/* Filters Row */}
+        <div className="flex flex-col md:flex-row gap-4 mb-10">
+          <div className="relative flex-1 group">
+            <FiSearch className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-purple-500 transition-colors" />
+            <input type="text" placeholder="ابحث بالاسم، الكود، أو الإيميل..." value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pr-12 pl-4 focus:border-purple-500/50 focus:outline-none transition-all font-bold" />
           </div>
-        </div>
-
-        {/* Pending Registration */}
-        <div className={`glass rounded-3xl p-6 border transition-all ${pending.length > 0 ? 'border-yellow-500/30' : 'border-white/5 opacity-60'}`}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-black text-lg flex items-center gap-2">
-              <FiUserCheck className="text-yellow-400" /> طلبات تسجيل بانتظار المراجعة
-              {pending.length > 0 && <span className="bg-yellow-500 text-black text-[10px] px-2 py-0.5 rounded-full">{pending.length}</span>}
-            </h2>
-          </div>
-          <div className="max-h-[300px] overflow-y-auto space-y-3 custom-scrollbar">
-            {pending.map(s => (
-              <div key={s.id} className="bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-4 flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="font-bold text-sm truncate">{s.name}</p>
-                  <p className="text-[10px] text-gray-400">{s.stage || 'غير محدد'}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => updateStatus(s.id,'approved')} className="bg-yellow-500 text-black text-[10px] px-3 py-1.5 rounded-lg font-bold hover:bg-yellow-600 transition-colors">قبول</button>
-                  <button onClick={() => updateStatus(s.id,'rejected')} className="bg-white/5 text-red-400 text-[10px] px-3 py-1.5 rounded-lg font-bold border border-white/5 hover:bg-red-500/10">رفض</button>
-                </div>
-              </div>
-            ))}
-            {pending.length === 0 && <p className="text-center py-6 text-xs text-gray-500">لا يوجد طلبات تسجيل معلقة</p>}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Students List with Filters */}
-      <div className="glass rounded-3xl p-6 border border-white/5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <h2 className="text-xl font-black">الطلاب المقبولين</h2>
           
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search */}
-            <div className="relative group min-w-[250px]">
-              <FiSearch className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-purple-500 transition-colors" />
-              <input 
-                type="text" 
-                placeholder="ابحث بالاسم أو الكود..." 
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 pr-11 pl-4 text-sm focus:border-purple-500 focus:outline-none transition-all"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-            {/* Filter */}
-            <div className="relative">
-              <FiFilter className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" />
-              <select 
-                className="bg-white/5 border border-white/10 rounded-2xl py-2.5 pr-11 pl-8 text-sm focus:border-purple-500 focus:outline-none appearance-none"
-                value={stageFilter}
-                onChange={e => setStageFilter(e.target.value)}
-              >
-                <option value="" className="bg-gray-900">كل المراحل</option>
-                {STAGES.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
-              </select>
-            </div>
-          </div>
+          <select value={stageFilter} onChange={e => setStageFilter(e.target.value)}
+            className="bg-white/[0.03] border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-purple-500/50 appearance-none min-w-[180px]">
+            <option value="" className="bg-gray-900">كل المراحل</option>
+            {STAGES.map(s => <option key={s} value={s} className="bg-gray-900">{s}</option>)}
+          </select>
+
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="bg-white/[0.03] border border-white/10 rounded-2xl px-6 py-4 text-sm font-bold focus:outline-none focus:border-purple-500/50 appearance-none min-w-[150px]">
+            <option value="all" className="bg-gray-900">كل الحالات</option>
+            <option value="active" className="bg-gray-900 text-emerald-500">نشط فقط</option>
+            <option value="blocked" className="bg-gray-900 text-red-500">محظور فقط</option>
+          </select>
         </div>
 
-        {/* Table/List View */}
-        <div className="space-y-3">
-          {filteredStudents.map(s => (
-            <div key={s.id} className={`group flex flex-col md:flex-row md:items-center gap-4 p-5 rounded-3xl border transition-all hover:shadow-xl ${s.is_active ? 'bg-white/5 border-white/5 hover:border-purple-500/30' : 'bg-red-500/5 border-red-500/10 opacity-70'}`}>
+        {/* List View */}
+        <div className="space-y-4">
+          {filteredStudents.map((s, i) => (
+            <div key={s.id} className={`group flex flex-col md:flex-row md:items-center gap-6 p-6 rounded-[2rem] border transition-all duration-300 ${s.is_active ? 'bg-white/[0.02] border-white/5 hover:border-purple-500/30' : 'bg-red-500/[0.03] border-red-500/10 grayscale opacity-60 hover:grayscale-0 hover:opacity-100'}`}>
               
-              {/* Avatar & Basic Info */}
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shadow-lg shrink-0 ${s.is_active ? 'bg-gradient-to-br from-purple-500 to-indigo-600' : 'bg-gray-700'}`}>
+              <div className="flex items-center gap-5 flex-1">
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-black text-2xl shadow-inner shrink-0 ${s.is_active ? 'bg-gradient-to-br from-purple-500/20 to-indigo-500/20 text-purple-400' : 'bg-gray-800 text-gray-500'}`}>
                   {s.name?.[0]}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-sm md:text-base truncate">{s.name}</h3>
-                    {s.student_code && <span className="bg-purple-500/10 text-purple-400 text-[10px] font-mono px-2 py-0.5 rounded-md border border-purple-500/20">{s.student_code}</span>}
+                  <div className="flex items-center gap-3 mb-1.5">
+                    <h3 className="font-black text-lg text-white group-hover:text-purple-400 transition-colors truncate">{s.name}</h3>
+                    <span className="bg-white/5 text-gray-500 text-[10px] font-mono px-2 py-0.5 rounded-md border border-white/5 uppercase tracking-tighter group-hover:border-purple-500/20 group-hover:text-purple-500">#{s.student_code}</span>
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 opacity-50">
-                    <span className="flex items-center gap-1 text-[10px]"><FiMail size={12}/> {s.email}</span>
-                    {s.phone && <span className="flex items-center gap-1 text-[10px]"><FiPhone size={12}/> {s.phone}</span>}
-                    {s.stage && <span className="flex items-center gap-1 text-[10px]"><FiBook size={12}/> {s.stage}</span>}
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    <span className="flex items-center gap-2 text-xs font-bold text-gray-500"><FiMail className="text-purple-500/50"/> {s.email}</span>
+                    <span className="flex items-center gap-2 text-xs font-bold text-gray-500"><FiPhone className="text-emerald-500/50"/> {s.phone}</span>
+                    <span className="flex items-center gap-2 text-xs font-bold text-gray-500"><FiBook className="text-blue-500/50"/> {s.stage}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Status & Controls */}
-              <div className="flex items-center justify-between md:justify-end gap-3 border-t md:border-t-0 border-white/5 pt-4 md:pt-0">
-                {/* Change Password Inline */}
-                {changingPassword === s.id ? (
-                  <div className="flex items-center gap-2 animate-scale-in">
-                    <input 
-                      type="password" 
-                      placeholder="كلمة المرور الجديدة" 
-                      className="bg-white/10 border border-purple-500/30 rounded-xl px-3 py-2 text-[10px] w-32 focus:outline-none" 
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                    />
-                    <button onClick={() => handleChangePassword(s.id, s.email)} className="bg-emerald-500 text-white p-2 rounded-xl hover:bg-emerald-600 transition-colors">✅</button>
-                    <button onClick={() => {setChangingPassword(null); setNewPassword('')}} className="bg-white/10 text-white p-2 rounded-xl hover:bg-white/20 transition-colors">✕</button>
-                  </div>
-                ) : (
-                  <button 
-                    onClick={() => setChangingPassword(s.id)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all"
-                  >
-                    <FiKey /> كلمة المرور
-                  </button>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => toggleActive(s.id, s.is_active)}
-                    className={`p-2.5 rounded-xl transition-all ${s.is_active ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500 hover:text-white' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white'}`}
-                    title={s.is_active ? 'تعطيل الحساب' : 'تفعيل الحساب'}
-                  >
-                    {s.is_active ? <FiUserX size={16}/> : <FiUserCheck size={16}/>}
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if(window.confirm(`هل أنت متأكد من حذف الطالب "${s.name}" نهائياً؟`)) {
-                        supabase.from('students').delete().eq('id', s.id).then(() => {
-                          toast.success('تم حذف الطالب بنجاح');
-                          loadData();
-                        });
-                      }
-                    }}
-                    className="p-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
-                    title="حذف نهائي"
-                  >
-                    <FiTrash2 size={16}/>
-                  </button>
-                </div>
+              {/* Actions */}
+              <div className="flex items-center gap-3 border-t md:border-t-0 border-white/5 pt-4 md:pt-0">
+                 <button onClick={() => setChangingPassword(s.id)} 
+                   className="p-3 rounded-xl bg-white/5 text-gray-400 hover:bg-indigo-500 hover:text-white transition-all" title="تغيير كلمة المرور">
+                   <FiKey size={18} />
+                 </button>
+                 <button onClick={() => {
+                   supabase.from('students').update({ is_active: !s.is_active }).eq('id', s.id).then(() => loadData());
+                   toast.success(s.is_active ? 'تم إيقاف الحساب' : 'تم تفعيل الحساب');
+                 }} 
+                   className={`p-3 rounded-xl transition-all ${s.is_active ? 'bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white' : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white'}`}>
+                   {s.is_active ? <FiUserX size={18} /> : <FiUserCheck size={18} />}
+                 </button>
+                 <button onClick={() => {
+                   if(confirm('سيتم حذف الطالب وكافة بياناته ودرجاته نهائياً.. هل أنت متأكد؟')) {
+                     supabase.from('students').delete().eq('id', s.id).then(() => loadData());
+                   }
+                 }} 
+                   className="p-3 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all">
+                   <FiTrash2 size={18} />
+                 </button>
               </div>
             </div>
           ))}
-
-          {filteredStudents.length === 0 && (
-            <div className="text-center py-20 bg-white/5 rounded-3xl border border-dashed border-white/10">
-              <div className="text-4xl mb-4 opacity-20">🔍</div>
-              <p className="text-gray-500 font-bold">مفيش طلاب بالبيانات دي..</p>
-              <button onClick={() => {setSearch(''); setStageFilter('')}} className="text-purple-500 text-xs mt-2 underline">إلغاء الفلترة</button>
-            </div>
-          )}
         </div>
       </div>
     </div>
