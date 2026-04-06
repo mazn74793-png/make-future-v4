@@ -9,73 +9,54 @@ const supabaseAdmin = createClient(
 
 export async function POST(req) {
   try {
-    // 1. التأكد من صلاحية الأدمن (Security Layer)
-    const { data: { user: adminUser } } = await supabaseAdmin.auth.getUser(req.headers.get('Authorization')?.split(' ')[1] || '');
-    
-    const { data: isAdmin } = await supabaseAdmin
-      .from('admins')
-      .select('id')
-      .eq('email', adminUser?.email)
-      .single();
+    const body = await req.json();
+    const { studentId, email, newPassword, userId } = body;
 
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'غير مسموح لك بالقيام بهذا الإجراء' }, { status: 403 });
-    }
+    if (!newPassword || newPassword.length < 6)
+      return NextResponse.json({ error: 'كلمة المرور أقل من 6 أحرف' });
 
-    const { studentId, email, newPassword } = await req.json();
-    if (!newPassword || newPassword.length < 6) {
-      return NextResponse.json({ error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
-    }
+    // جيب بيانات الطالب من DB
+    let query = supabaseAdmin.from('students').select('id, user_id, email');
+    if (studentId) query = query.eq('id', studentId);
+    else if (userId) query = query.eq('user_id', userId);
+    const { data: student, error: fetchErr } = await query.single();
 
-    // 2. جلب بيانات الطالب من القاعدة
-    const { data: student, error: studentError } = await supabaseAdmin
-      .from('students')
-      .select('user_id, email')
-      .eq('id', studentId)
-      .single();
+    if (fetchErr || !student)
+      return NextResponse.json({ error: 'الطالب مش موجود' });
 
-    if (studentError || !student) return NextResponse.json({ error: 'الطالب غير موجود' });
+    const studentEmail = email || student.email;
+    let targetUserId = student.user_id || userId;
 
-    let userId = student.user_id;
-    const targetEmail = email || student.email;
-
-    // 3. لو الطالب مش مربوط بـ Auth
-    if (!userId) {
-      // بحث سريع عن طريق الإيميل بدلاً من listUsers الشاملة
-      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-      const authUser = users?.find(u => u.email === targetEmail);
+    // لو مفيش user_id — دور في auth بالإيميل
+    if (!targetUserId && studentEmail) {
+      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const authUser = users?.find(u => u.email?.toLowerCase() === studentEmail.toLowerCase());
 
       if (authUser) {
-        userId = authUser.id;
-        await supabaseAdmin.from('students').update({ user_id: userId }).eq('id', studentId);
+        targetUserId = authUser.id;
+        // ربط user_id بالطالب تلقائياً
+        await supabaseAdmin.from('students').update({ user_id: targetUserId }).eq('id', student.id);
       } else {
-        // إنشاء حساب جديد فوراً وتأكيده
-        const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          email: targetEmail,
+        // إنشاء حساب جديد للطالب في auth
+        const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email: studentEmail,
           password: newPassword,
-          email_confirm: true, // تأكيد الإيميل تلقائياً
-          user_metadata: { role: 'student' } // إضافة رول الطالب في الميتاداتا
+          email_confirm: true,
         });
-
-        if (createError) return NextResponse.json({ error: createError.message });
-        
-        userId = newUser.user.id;
-        await supabaseAdmin.from('students').update({ user_id: userId }).eq('id', studentId);
-        return NextResponse.json({ success: true, message: 'تم إنشاء حساب جديد للطالب' });
+        if (createErr) return NextResponse.json({ error: createErr.message });
+        await supabaseAdmin.from('students').update({ user_id: newUser.user.id }).eq('id', student.id);
+        return NextResponse.json({ success: true, created: true });
       }
     }
 
-    // 4. تحديث الباسورد للحساب الموجود فعلياً
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, { 
-      password: newPassword,
-      email: targetEmail // تحديث الإيميل أيضاً لو الأدمن غيره
-    });
+    if (!targetUserId)
+      return NextResponse.json({ error: 'مش قادر يحدد المستخدم' });
 
-    if (updateError) return NextResponse.json({ error: updateError.message });
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, { password: newPassword });
+    if (error) return NextResponse.json({ error: error.message });
 
-    return NextResponse.json({ success: true, message: 'تم تحديث البيانات بنجاح' });
-
+    return NextResponse.json({ success: true });
   } catch (e) {
-    return NextResponse.json({ error: 'حدث خطأ داخلي في الخادم' }, { status: 500 });
+    return NextResponse.json({ error: e.message });
   }
 }
