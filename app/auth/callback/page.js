@@ -1,97 +1,69 @@
 'use client';
-import { useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import toast from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
-export default function AuthCallback() {
+export default function AuthCallbackPage() {
   const router = useRouter();
-  const called = useRef(false); // لمنع التكرار في الـ Development mode
 
   useEffect(() => {
-    if (called.current) return;
-    called.current = true;
+    const handle = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) { router.push('/login'); return; }
 
-    const handleAuth = async () => {
-      try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user) {
-          router.replace('/login');
-          return;
+      // شيك لو أدمن
+      const { data: admin } = await supabase
+        .from('admins').select('id').eq('email', user.email).single();
+      if (admin) { router.push('/dashboard'); return; }
+
+      // دور على طالب بنفس الإيميل
+      const { data: studentByEmail } = await supabase
+        .from('students').select('*').eq('email', user.email).single();
+
+      if (studentByEmail) {
+        // لو الطالب موجود بالإيميل — ربطه بالـ user_id الجديد لو مش مربوط
+        if (!studentByEmail.user_id || studentByEmail.user_id !== user.id) {
+          await supabase.from('students')
+            .update({ user_id: user.id })
+            .eq('email', user.email);
         }
 
-        // 1. هل المستخدم أدمن؟
-        const { data: admin } = await supabase
-          .from('admins')
-          .select('id')
-          .eq('email', user.email)
-          .single();
-
-        if (admin) {
-          router.replace('/dashboard');
-          return;
+        // توجيه حسب الحالة
+        if (!studentByEmail.profile_complete) {
+          router.push('/complete-profile'); return;
         }
-
-        // 2. التحقق من بيانات الطالب
-        const { data: student, error: studentError } = await supabase
-          .from('students')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        // لو ملوش سجل خالص أو بياناته ناقصة
-        if (studentError || !student || !student.profile_complete) {
-          router.replace('/complete-profile');
-          return;
+        if (studentByEmail.status === 'approved') {
+          router.push('/student'); return;
         }
-
-        // 3. التحقق من حالة القبول
-        switch (student.status) {
-          case 'approved':
-            router.replace('/student');
-            break;
-          case 'pending':
-            router.replace('/pending');
-            break;
-          case 'rejected':
-            toast.error('عذراً، تم رفض طلب انضمامك للمنصة');
-            await supabase.auth.signOut();
-            router.replace('/login?rejected=1');
-            break;
-          default:
-            router.replace('/');
+        if (studentByEmail.status === 'pending') {
+          router.push('/pending'); return;
         }
-
-      } catch (err) {
-        console.error('Auth Callback Error:', err);
-        toast.error('حدث خطأ أثناء التحقق من الحساب');
-        router.replace('/login');
+        router.push('/pending'); return;
       }
+
+      // دور بالـ user_id
+      const { data: studentByUserId } = await supabase
+        .from('students').select('*').eq('user_id', user.id).single();
+
+      if (studentByUserId) {
+        if (!studentByUserId.profile_complete) { router.push('/complete-profile'); return; }
+        if (studentByUserId.status === 'approved') { router.push('/student'); return; }
+        router.push('/pending'); return;
+      }
+
+      // طالب جديد خالص — اكمل البيانات
+      router.push('/complete-profile');
     };
 
-    handleAuth();
+    handle();
   }, [router]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#09090b] relative overflow-hidden">
-      {/* استدعاء الـ Orbs اللي عملناها قبل كدة عشان المنظر يفضل متناسق */}
-      <div className="aurora-orb aurora-orb-1 opacity-20" />
-      <div className="aurora-orb aurora-orb-2 opacity-20" />
-      
-      <div className="relative z-10 text-center space-y-6">
-        <div className="relative">
-           {/* Spinner بشكل أنظف ومتماشي مع الـ Primary Color */}
-          <div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <h2 className="text-xl font-black text-white tracking-tight">جاري التحقق من الهوية</h2>
-          <p className="text-gray-500 text-sm animate-pulse">لحظات ونجهز لك مقعدك في الفصل... 🎓</p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+      <div className="text-center">
+        <div className="w-14 h-14 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
+          style={{ borderColor: 'rgba(99,102,241,0.3)', borderTopColor: '#6366f1' }} />
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>جاري التحقق من حسابك...</p>
       </div>
     </div>
   );
